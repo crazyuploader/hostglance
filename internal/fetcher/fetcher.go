@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -20,6 +21,7 @@ import (
 
 const (
 	fetchTimeout     = 10 * time.Second
+	dialTimeout      = 3 * time.Second
 	maxResponseBytes = 10 << 20
 	// ponytail: keep one fixed cap; make it configurable only if large fleets need tuning.
 	maxHostWorkers = 8
@@ -45,6 +47,9 @@ func New(hosts []config.Host, cacheTTL time.Duration) *Fetcher {
 		client: &http.Client{
 			Timeout: fetchTimeout,
 			Transport: &http.Transport{
+				// Fail fast on filtered ports so auto discovery does not stall pages.
+				// ponytail: fixed 3s connect timeout; make configurable if slow links need more.
+				DialContext:         (&net.Dialer{Timeout: dialTimeout}).DialContext,
 				MaxIdleConnsPerHost: 10,
 				IdleConnTimeout:     90 * time.Second,
 			},
@@ -227,9 +232,6 @@ func (f *Fetcher) fetchExporter(
 	kind string,
 ) exporterResult {
 	mode := exp.Mode
-	if mode == "" {
-		mode = config.ModeAuto
-	}
 	result := exporterResult{status: model.ExporterStatus{Mode: string(mode)}}
 	if mode == config.ModeDisabled {
 		return result
@@ -259,6 +261,8 @@ func (f *Fetcher) fetchExporter(
 		kind,
 		"reason",
 		message,
+		"error",
+		err,
 	)
 	return result
 }

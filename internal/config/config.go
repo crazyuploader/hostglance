@@ -4,6 +4,7 @@ package config
 import (
 	"cmp"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -49,6 +50,8 @@ func parseFlexDuration(v any, def time.Duration) time.Duration {
 	switch t := v.(type) {
 	case nil:
 		return def
+	case time.Duration: // bound duration flags
+		d = t
 	case int:
 		d = time.Duration(t) * time.Second
 	case int64:
@@ -77,15 +80,23 @@ func Load() (*Config, error) {
 	return load(viper.GetViper())
 }
 
+// knownKeys lists every accepted setting; anything else is a typo.
+var knownKeys = []string{
+	"addr", "refresh", "cache_ttl", "debug", "trusted_proxies",
+	"max_usage_percent", "log_format", "hosts", "endpoints",
+	"history.enabled", "history.path", "history.retention", "history.record_interval",
+}
+
 func load(v *viper.Viper) (*Config, error) {
-	histRetention := v.GetDuration("history.retention")
-	if histRetention <= 0 {
-		histRetention = 720 * time.Hour // 30 days default
+	for _, key := range v.AllKeys() {
+		if !slices.Contains(knownKeys, key) {
+			return nil, fmt.Errorf("unknown setting %q", key)
+		}
 	}
 	cfg := &Config{
 		Addr:            cmp.Or(v.GetString("addr"), ":8054"),
 		Refresh:         parseFlexDuration(v.Get("refresh"), 300*time.Second),
-		CacheTTL:        time.Duration(cmp.Or(v.GetInt("cache_ttl"), 30)) * time.Second,
+		CacheTTL:        parseFlexDuration(v.Get("cache_ttl"), 30*time.Second),
 		Debug:           v.GetBool("debug"),
 		TrustedProxies:  v.GetStringSlice("trusted_proxies"),
 		MaxUsagePercent: v.GetFloat64("max_usage_percent"),
@@ -93,9 +104,15 @@ func load(v *viper.Viper) (*Config, error) {
 		History: HistoryConfig{
 			Enabled:        v.GetBool("history.enabled"),
 			Path:           cmp.Or(v.GetString("history.path"), "./data/history.db"),
-			Retention:      histRetention,
-			RecordInterval: v.GetDuration("history.record_interval"),
+			Retention:      parseFlexDuration(v.Get("history.retention"), 720*time.Hour),
+			RecordInterval: parseFlexDuration(v.Get("history.record_interval"), 0),
 		},
+	}
+	if cfg.LogFormat != "text" && cfg.LogFormat != "json" {
+		return nil, fmt.Errorf("log_format must be text or json")
+	}
+	if cfg.MaxUsagePercent < 0 || cfg.MaxUsagePercent > 100 {
+		return nil, fmt.Errorf("max_usage_percent must be between 0 and 100")
 	}
 	var err error
 	cfg.Hosts, err = loadHosts(v)

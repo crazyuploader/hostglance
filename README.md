@@ -21,6 +21,8 @@ hosts:
 go run . serve --config config.yaml
 ```
 
+To validate the config and probe every host once without starting the server, run `go run . check --config config.yaml`. It prints which exporters each host has and exits non-zero if an exporter with `mode: enabled` is unreachable.
+
 Open `http://localhost:8054`. The System page lists every configured host. Storage appears when ZFS or SMART metrics are available, or when either exporter is explicitly required. An empty host shows **No exporters detected**.
 
 For more settings, copy [config.yaml.example](config.yaml.example) to `config.yaml` and edit its hosts.
@@ -41,7 +43,7 @@ For more settings, copy [config.yaml.example](config.yaml.example) to `config.ya
 - `--history-retention`: Retention period, e.g. `720h` for 30 days (default: `720h`).
 - `--history-record-interval`: How often to record history samples, e.g. `5m` (default: same as `--refresh`).
 
-For example, `go run . serve --hosts nas.home,server02.home` configures two hosts. `HOSTGLANCE_HOSTS=nas.home,server02.home` provides the same list through the environment. Flags take precedence over environment variables, which take precedence over file settings. Use only one target format, `hosts` or `endpoints`, across all configuration sources.
+For example, `go run . serve --hosts nas.home,server02.home` configures two hosts. `HOSTGLANCE_HOSTS=nas.home,server02.home` provides the same list through the environment. Nested settings use underscores in environment variables, for example `HOSTGLANCE_HISTORY_ENABLED=true`. Flags take precedence over environment variables, which take precedence over file settings. Unknown settings, an invalid `log_format`, and a `max_usage_percent` outside 0–100 are rejected at startup. Use only one target format, `hosts` or `endpoints`, across all configuration sources.
 
 ## Config
 
@@ -192,7 +194,7 @@ Edits to host lists, exporter modes and URLs, `refresh`, and `debug` reload auto
 kill -HUP $(pgrep hostglance)
 ```
 
-Changes to `cache_ttl`, history settings, or listener settings require a restart.
+Changes to `addr`, `cache_ttl`, `trusted_proxies`, or history settings require a restart; a reload logs a warning naming any such changed setting.
 
 ## Docker
 
@@ -229,7 +231,7 @@ Health checks suit monitoring tools like Uptime Kuma. `GET /api/health/:label` r
 
 | Condition | HTTP status | Meaning |
 | --- | --- | --- |
-| Initial collection is still pending | `200` | `status: unknown`, `reason: discovery_pending` |
+| Initial collection is still pending | `503` | `status: unknown`, `reason: discovery_pending` |
 | Any `enabled` exporter is unavailable | `503` | A configured requirement failed |
 | Available ZFS data contains an unhealthy pool or exceeds `max_usage_percent` | `503` | Storage is unhealthy, regardless of exporter mode |
 | ZFS is `enabled` but reports no pools | `503` | Required ZFS storage is missing (`no_pools`) |
@@ -238,7 +240,7 @@ Health checks suit monitoring tools like Uptime Kuma. `GET /api/health/:label` r
 
 An unknown host status is neutral; exporter discovery cannot prove whether the machine itself is healthy.
 
-`GET /api/health/:label/:pool` also returns `200` with `status: unknown`, `reason: discovery_pending` while initial collection is pending. After collection, it returns `503` if ZFS is unavailable, the pool is missing or unhealthy, or its usage exceeds `max_usage_percent`. A failure in an unrelated node or SMART exporter does not fail a healthy pool check.
+`GET /api/health/:label/:pool` also returns `503` with `status: unknown`, `reason: discovery_pending` while initial collection is pending. After collection, it returns `503` if ZFS is unavailable, the pool is missing or unhealthy, or its usage exceeds `max_usage_percent`. A failure in an unrelated node or SMART exporter does not fail a healthy pool check.
 
 Examples: `GET /api/health/node-1` and `GET /api/health/node-1/tank`.
 

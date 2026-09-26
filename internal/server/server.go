@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -179,11 +180,32 @@ func watchConfigReload(sigs <-chan os.Signal, f *fetcher.Fetcher, cfgPtr *atomic
 			slog.Error("config reload failed", "error", err)
 			continue
 		}
+		if changed := restartOnlyChanges(cfgPtr.Load(), newCfg); len(changed) > 0 {
+			slog.Warn("restart required to apply changed settings", "settings", changed)
+		}
 		setupLogger(newCfg)
 		f.SetHosts(newCfg.Hosts)
 		cfgPtr.Store(newCfg)
 		slog.Info("config reloaded successfully")
 	}
+}
+
+// restartOnlyChanges names settings that are read once at startup.
+func restartOnlyChanges(old, cur *config.Config) []string {
+	changed := []string{}
+	if old.Addr != cur.Addr {
+		changed = append(changed, "addr")
+	}
+	if old.CacheTTL != cur.CacheTTL {
+		changed = append(changed, "cache_ttl")
+	}
+	if old.History != cur.History {
+		changed = append(changed, "history")
+	}
+	if !slices.Equal(old.TrustedProxies, cur.TrustedProxies) {
+		changed = append(changed, "trusted_proxies")
+	}
+	return changed
 }
 
 // setupHistory opens the history store and starts its recorder when enabled.
@@ -559,12 +581,21 @@ func serveHealthCheck(c fiber.Ctx, f *fetcher.Fetcher, label, poolName string, c
 		})
 	}
 
+	return healthResponse(c, node, label, poolName, cfg)
+}
+
+// healthResponse reports a fetched node; pool checks depend only on ZFS.
+func healthResponse(c fiber.Ctx, node *model.NodeData, label, poolName string, cfg *config.Config) error {
 	if node.FetchedAt.IsZero() {
-		return c.JSON(fiber.Map{
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 			"status": "unknown", "reason": "discovery_pending", "label": node.Label,
 		})
 	}
-	if poolName == "" && node.Exporters.HasErrors() {
+	failed := node.Exporters.HasErrors()
+	if poolName != "" {
+		failed = node.Exporters.ZFS.Error != ""
+	}
+	if failed {
 		slog.Debug("required exporter unavailable", "label", label)
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 			"status":    "down",

@@ -286,3 +286,84 @@ func TestTemplatesRenderHostDiscoveryStates(t *testing.T) {
 		})
 	}
 }
+
+func TestHealthResponsePreChecks(t *testing.T) {
+	t.Parallel()
+	failed := model.ExporterStatus{Mode: "enabled", Error: "exporter unavailable"}
+	tank := []model.Pool{{Name: "tank", Health: model.HealthOnline}}
+	tests := []struct {
+		name       string
+		node       model.NodeData
+		pool       string
+		wantStatus int
+		wantReason string
+	}{
+		{
+			name:       "discovery pending is not healthy",
+			node:       model.NodeData{Label: "host", Exporters: automaticExporters()},
+			wantStatus: http.StatusServiceUnavailable,
+			wantReason: "discovery_pending",
+		},
+		{
+			name: "pool check reports failed ZFS exporter",
+			node: model.NodeData{
+				Label: "host", FetchedAt: time.Now(),
+				Exporters: model.ExporterStatuses{ZFS: failed},
+			},
+			pool:       "tank",
+			wantStatus: http.StatusServiceUnavailable,
+			wantReason: "exporter_unavailable",
+		},
+		{
+			name: "pool check ignores failed SMART exporter",
+			node: model.NodeData{
+				Label: "host", FetchedAt: time.Now(), Pools: tank,
+				Exporters: model.ExporterStatuses{
+					ZFS:      model.ExporterStatus{Mode: "auto", Available: true},
+					Smartctl: failed,
+				},
+			},
+			pool:       "tank",
+			wantStatus: http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			app := fiber.New()
+			app.Get("/", func(c fiber.Ctx) error {
+				return healthResponse(c, &tt.node, tt.node.Label, tt.pool, &config.Config{})
+			})
+			resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/", http.NoBody))
+			if err != nil {
+				t.Fatalf("app.Test: %v", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			body := map[string]any{}
+			if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if resp.StatusCode != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode, tt.wantStatus)
+			}
+			if tt.wantReason != "" && body["reason"] != tt.wantReason {
+				t.Errorf("reason = %v, want %q", body["reason"], tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestRestartOnlyChanges(t *testing.T) {
+	t.Parallel()
+	old := &config.Config{Addr: ":8054", CacheTTL: time.Minute, TrustedProxies: []string{"10.0.0.1"}}
+	same := *old
+	same.Refresh = time.Hour // hot-reloadable
+	if got := restartOnlyChanges(old, &same); len(got) != 0 {
+		t.Errorf("hot-reloadable change flagged: %v", got)
+	}
+	cur := &config.Config{Addr: ":9000", History: config.HistoryConfig{Enabled: true}}
+	got := strings.Join(restartOnlyChanges(old, cur), ",")
+	if got != "addr,cache_ttl,history,trusted_proxies" {
+		t.Errorf("changes = %q", got)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"syscall"
 
 	"github.com/fsnotify/fsnotify"
@@ -71,6 +72,7 @@ func initConfig() {
 		viper.AddConfigPath("$HOME/.config/hostglance")
 	}
 	viper.SetEnvPrefix("HOSTGLANCE")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_")) // HOSTGLANCE_HISTORY_ENABLED
 	viper.AutomaticEnv()
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config:", viper.ConfigFileUsed())
