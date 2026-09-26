@@ -130,6 +130,7 @@ func (f *Fetcher) Snapshot() []model.NodeData {
 	return append([]model.NodeData{}, f.cache...)
 }
 
+// collect scrapes all hosts, serialized, unless a fresh cache is available.
 func (f *Fetcher) collect(ctx context.Context, force bool) ([]model.NodeData, bool) {
 	select {
 	case f.refresh <- struct{}{}:
@@ -173,6 +174,7 @@ func (f *Fetcher) collect(ctx context.Context, force bool) ([]model.NodeData, bo
 	}
 }
 
+// fetchHosts scrapes hosts with a bounded worker pool, preserving order.
 func (f *Fetcher) fetchHosts(ctx context.Context, hosts []config.Host) []model.NodeData {
 	results := make([]model.NodeData, len(hosts))
 	workers := min(len(hosts), maxHostWorkers)
@@ -220,11 +222,13 @@ func (f *Fetcher) fetchRaw(ctx context.Context, rawURL string) ([]parser.Sample,
 	return samples, nil
 }
 
+// exporterResult is one exporter scrape outcome.
 type exporterResult struct {
 	status  model.ExporterStatus
 	samples []parser.Sample
 }
 
+// fetchExporter scrapes one exporter unless disabled; only enabled failures set Error.
 func (f *Fetcher) fetchExporter(
 	ctx context.Context,
 	label string,
@@ -267,6 +271,7 @@ func (f *Fetcher) fetchExporter(
 	return result
 }
 
+// recognizesExporter reports whether any sample has the exporter's metric prefix.
 func recognizesExporter(samples []parser.Sample, kind string) bool {
 	prefix := kind + "_"
 	for _, sample := range samples {
@@ -277,6 +282,7 @@ func recognizesExporter(samples []parser.Sample, kind string) bool {
 	return false
 }
 
+// fetchOne scrapes all exporters on one host concurrently.
 func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData {
 	var node, zfs, smartctl exporterResult
 	var wg sync.WaitGroup

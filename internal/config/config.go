@@ -87,6 +87,7 @@ var knownKeys = []string{
 	"history.enabled", "history.path", "history.retention", "history.record_interval",
 }
 
+// loadFrom builds and validates a Config from the given viper instance.
 func loadFrom(v *viper.Viper) (*Config, error) {
 	for _, key := range v.AllKeys() {
 		if !slices.Contains(knownKeys, key) {

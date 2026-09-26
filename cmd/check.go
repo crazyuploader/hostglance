@@ -33,6 +33,7 @@ var checkCmd = &cobra.Command{
 	},
 }
 
+// init registers the check command.
 func init() {
 	rootCmd.AddCommand(checkCmd)
 }
@@ -53,6 +54,7 @@ func writeCheck(out io.Writer, nodes []model.NodeData) int {
 	return failed
 }
 
+// checkState renders one exporter status as a table cell.
 func checkState(s model.ExporterStatus) string {
 	switch {
 	case s.Available:

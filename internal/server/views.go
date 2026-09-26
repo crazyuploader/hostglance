@@ -144,6 +144,7 @@ func hostViews(nodes []model.NodeData) []systemView {
 	return out
 }
 
+// hostView builds the system row for one host.
 func hostView(node model.NodeData) systemView {
 	sys := node.System
 	if sys != nil && node.Exporters.ZFS.Available {

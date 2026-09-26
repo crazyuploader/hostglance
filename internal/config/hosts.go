@@ -50,6 +50,7 @@ type Host struct {
 	LegacyCombinedMetrics bool `mapstructure:"-"`
 }
 
+// loadHosts decodes hosts or legacy endpoints and rejects duplicate labels.
 func loadHosts(v *viper.Viper) ([]Host, error) {
 	hosts, err := decodeList[Host](v.Get("hosts"), "address")
 	if err != nil {
@@ -113,6 +114,7 @@ func decodeList[T any](raw any, shorthand string) ([]T, error) {
 	return out, nil
 }
 
+// normalizeHost validates an address and resolves exporter modes and default URLs.
 func normalizeHost(host *Host) error {
 	host.Address = strings.TrimSpace(host.Address)
 	if strings.HasPrefix(host.Address, "[") && strings.HasSuffix(host.Address, "]") {
@@ -157,6 +159,7 @@ func normalizeHost(host *Host) error {
 	return nil
 }
 
+// validateExporterURL requires an http(s) URL with a host and no fragment.
 func validateExporterURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -172,6 +175,7 @@ func validateExporterURL(raw string) error {
 	return nil
 }
 
+// legacyHost converts an old endpoints entry, keeping its label for history.
 func legacyHost(ep legacyEndpoint) (Host, error) {
 	if ep.URL == "" {
 		return Host{}, fmt.Errorf("missing url")
