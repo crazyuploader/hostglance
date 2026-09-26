@@ -144,7 +144,7 @@
 
   <div class="page-header animate-in">
     <h1 class="page-title">System Overview</h1>
-    <p class="page-sub">{{.TotalNodes}} host{{if gt .TotalNodes 1}}s{{end}} &middot; {{.TotalCores}} cores &middot; {{.ExporterErrors}} with exporter errors &middot; fetched {{.FetchedAt}}</p>
+    <p class="page-sub">{{plural .TotalNodes "host"}} &middot; {{plural .TotalCores "core"}} &middot; fetched {{.FetchedAt}}</p>
   </div>
 
   {{if not .Nodes}}
@@ -196,12 +196,14 @@
   <section class="sys-card {{if $node.Exporters.HasErrors}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">
 
     <div class="sys-head">
-      <div class="sys-hostname">{{$node.Label}}</div>
+      {{$title := hostTitle $node.Label $node.System}}
+      <div class="sys-hostname">{{$title}}</div>
+      {{if ne $title $node.Label}}<div class="sys-location">{{$node.Label}}</div>{{end}}
       {{if $node.Location}}<div class="sys-location">{{$node.Location}}</div>{{end}}
       <div class="sys-head-spacer"></div>
       {{with $node.System}}
       <div class="sys-badges">
-        {{if and .Hostname (ne .Hostname $node.Label)}}<span class="sys-badge">host: {{.Hostname}}</span>{{end}}
+        {{if and .Hostname (ne .Hostname $title)}}<span class="sys-badge">host: {{.Hostname}}</span>{{end}}
         {{if .OSPretty}}<span class="sys-badge">{{.OSPretty}}</span>{{end}}
         {{if .Kernel}}<span class="sys-badge">{{.Kernel}}</span>{{end}}
         {{if gt .UptimeSecs 0.0}}<span class="sys-badge">up {{fmtUptime .UptimeSecs}}</span>{{end}}
@@ -210,10 +212,10 @@
       {{end}}
     </div>
 
-    {{if $node.Exporters.ZFS.Error}}<div class="sys-err">ZFS: {{$node.Exporters.ZFS.Error}}</div>{{end}}
-    {{if $node.Exporters.Smartctl.Error}}<div class="sys-err">Disk health: {{$node.Exporters.Smartctl.Error}}</div>{{end}}
-    {{if $node.Exporters.StorageVisible}}
-    <div class="sys-storage"><a href="/storage">Storage</a> &middot; {{$node.PoolCount}} pools &middot; {{$node.DiskCount}} disks</div>
+    {{if $node.Exporters.ZFS.Error}}<div class="sys-err">Required ZFS exporter {{$node.Exporters.ZFS.Error}}</div>{{end}}
+    {{if $node.Exporters.Smartctl.Error}}<div class="sys-err">Required SMART exporter {{$node.Exporters.Smartctl.Error}}</div>{{end}}
+    {{if or $node.PoolCount $node.DiskCount}}
+    <div class="sys-storage"><a href="/storage">Storage</a> &middot; {{plural $node.PoolCount "pool"}} &middot; {{plural $node.DiskCount "disk"}}</div>
     {{end}}
     {{if and (not $node.System) (not $node.Error)}}
     <div class="sys-discovery">
@@ -228,7 +230,7 @@
         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
-      <span>System: {{$node.Error}}</span>
+      <span>Required node exporter {{$node.Error}}</span>
     </div>
     {{else}}{{with $node.System}}
     <div class="sys-grid">
@@ -364,10 +366,11 @@
 (function () {
   'use strict';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const skipIntro = prefersReducedMotion || document.documentElement.classList.contains('no-anim');
 
   /* Animate bars */
   const fills = document.querySelectorAll('.bar-fill[data-width]');
-  if (!prefersReducedMotion) {
+  if (!skipIntro) {
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         fills.forEach(function (el) { el.style.width = el.getAttribute('data-width') + '%'; });

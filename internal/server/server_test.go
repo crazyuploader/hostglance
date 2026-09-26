@@ -235,10 +235,10 @@ func TestTemplatesRenderHostDiscoveryStates(t *testing.T) {
 			FetchedAt: now,
 			Exporters: model.ExporterStatuses{
 				Node: model.ExporterStatus{
-					Mode: "enabled", Error: "exporter unavailable",
+					Mode: "enabled", Error: "unreachable",
 				},
 				Smartctl: model.ExporterStatus{
-					Mode: "enabled", Error: "exporter unavailable",
+					Mode: "enabled", Error: "unreachable",
 				},
 			},
 		},
@@ -289,7 +289,7 @@ func TestTemplatesRenderHostDiscoveryStates(t *testing.T) {
 
 func TestHealthResponsePreChecks(t *testing.T) {
 	t.Parallel()
-	failed := model.ExporterStatus{Mode: "enabled", Error: "exporter unavailable"}
+	failed := model.ExporterStatus{Mode: "enabled", Error: "unreachable"}
 	tank := []model.Pool{{Name: "tank", Health: model.HealthOnline}}
 	tests := []struct {
 		name       string
@@ -365,5 +365,48 @@ func TestRestartOnlyChanges(t *testing.T) {
 	got := strings.Join(restartOnlyChanges(old, cur), ",")
 	if got != "addr,cache_ttl,history,trusted_proxies" {
 		t.Errorf("changes = %q", got)
+	}
+}
+
+func TestHostViewHidesZFSMountsWhenPoolsShown(t *testing.T) {
+	t.Parallel()
+	sys := &model.SystemInfo{Filesystems: []model.FSInfo{
+		{Mountpoint: "/", FSType: "ext4"},
+		{Mountpoint: "/tank", FSType: "zfs"},
+	}}
+	node := model.NodeData{System: sys, Exporters: model.ExporterStatuses{
+		ZFS: model.ExporterStatus{Mode: "auto", Available: true},
+	}}
+	if got := hostView(node).System.Filesystems; len(got) != 1 || got[0].FSType != "ext4" {
+		t.Errorf("filesystems = %+v, want only ext4", got)
+	}
+	if len(sys.Filesystems) != 2 {
+		t.Error("hostView mutated the shared cache")
+	}
+	node.Exporters.ZFS.Available = false
+	if got := hostView(node).System.Filesystems; len(got) != 2 {
+		t.Errorf("ZFS mounts hidden without a ZFS exporter: %+v", got)
+	}
+}
+
+func TestHostTitleAndPlural(t *testing.T) {
+	t.Parallel()
+	sys := &model.SystemInfo{Hostname: "PVE01"}
+	for _, tt := range []struct {
+		label string
+		sys   *model.SystemInfo
+		want  string
+	}{
+		{"100.64.0.27", sys, "PVE01"},
+		{"2001:db8::1", sys, "PVE01"},
+		{"nas", sys, "nas"},
+		{"100.64.0.27", nil, "100.64.0.27"},
+	} {
+		if got := hostTitle(tt.label, tt.sys); got != tt.want {
+			t.Errorf("hostTitle(%q) = %q, want %q", tt.label, got, tt.want)
+		}
+	}
+	if plural(1, "pool") != "1 pool" || plural(0, "disk") != "0 disks" {
+		t.Error("plural formatting wrong")
 	}
 }

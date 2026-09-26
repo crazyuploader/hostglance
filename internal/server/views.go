@@ -1,6 +1,9 @@
 package server
 
 import (
+	"net/netip"
+	"slices"
+	"strconv"
 	"time"
 
 	"github.com/crazyuploader/hostglance/internal/config"
@@ -142,12 +145,21 @@ func hostViews(nodes []model.NodeData) []systemView {
 }
 
 func hostView(node model.NodeData) systemView {
+	sys := node.System
+	if sys != nil && node.Exporters.ZFS.Available {
+		// Pools already cover ZFS space. Copy so the shared cache stays read-only.
+		filtered := *sys
+		filtered.Filesystems = slices.DeleteFunc(slices.Clone(sys.Filesystems), func(fs model.FSInfo) bool {
+			return fs.FSType == "zfs"
+		})
+		sys = &filtered
+	}
 	return systemView{
 		Label:     node.Label,
 		Location:  node.Location,
 		FetchedAt: node.FetchedAt,
 		Error:     node.Exporters.Node.Error,
-		System:    node.System,
+		System:    sys,
 		Exporters: node.Exporters,
 		PoolCount: len(node.Pools),
 		DiskCount: len(node.Disks),
@@ -172,4 +184,21 @@ func nodeViews(nodes []model.NodeData) []nodeView {
 		}
 	}
 	return views
+}
+
+// hostTitle prefers the reported hostname over a bare IP label.
+// The label itself stays the stable history key.
+func hostTitle(label string, sys *model.SystemInfo) string {
+	if _, err := netip.ParseAddr(label); err == nil && sys != nil && sys.Hostname != "" {
+		return sys.Hostname
+	}
+	return label
+}
+
+// plural formats a count with a naively pluralized noun.
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
 }

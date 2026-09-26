@@ -242,9 +242,9 @@ func (f *Fetcher) fetchExporter(
 		result.samples = samples
 		return result
 	}
-	message := "exporter unavailable"
+	message := "unreachable"
 	if err == nil {
-		message = "no recognizable " + kind + " metrics"
+		message = "returned no " + kind + " metrics"
 	}
 	level := slog.LevelDebug
 	if mode == config.ModeEnabled {

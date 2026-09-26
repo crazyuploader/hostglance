@@ -748,6 +748,8 @@ func funcMap() template.FuncMap {
 		"healthClass":    healthClass,
 		"fmtNodeTime":    fmtNodeTime,
 		"toJSON":         toJSON,
+		"hostTitle":      hostTitle,
+		"plural":         plural,
 		"fmtSpeed":       fmtSpeed,
 		"exitStatusDesc": exitStatusDesc,
 		"diskHasIssues":  diskHasIssues,

@@ -88,19 +88,19 @@ Entries can be bare hostnames/IP addresses or objects. `address` is a hostname o
 
 Every unspecified exporter defaults to `auto`. Discovery checks known endpoints on the configured hosts and recognizes exporter-specific metric families:
 
-| Exporter | Default endpoint | Data |
-| --- | --- | --- |
-| `node` | `http://<host>:9100/metrics` | CPU, memory, load, network, filesystems, temperatures |
-| `zfs` | `http://<host>:9134/metrics` | ZFS pools and datasets |
-| `smartctl` | `http://<host>:9633/metrics` | Disk health, temperature, wear |
+| Exporter   | Default endpoint             | Data                                                  |
+| ---------- | ---------------------------- | ----------------------------------------------------- |
+| `node`     | `http://<host>:9100/metrics` | CPU, memory, load, network, filesystems, temperatures |
+| `zfs`      | `http://<host>:9134/metrics` | ZFS pools and datasets                                |
+| `smartctl` | `http://<host>:9633/metrics` | Disk health, temperature, wear                        |
 
 This does not scan your network or install exporters. The exporters must already be running and reachable from the app. Use `url` to override a port, scheme, or path, including HTTPS or a reverse proxy.
 
-| Mode | Behavior |
-| --- | --- |
-| `auto` | Collect when a recognized exporter responds. Missing or unavailable exporters are silent and their sections are hidden. |
-| `enabled` | Require this exporter. Keep its section visible and report an error if it is unavailable or its response is not recognized. |
-| `disabled` | Never request or collect this exporter's metrics. |
+| Mode       | Behavior                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `auto`     | Collect when a recognized exporter responds. Missing or unavailable exporters are silent and their sections are hidden.     |
+| `enabled`  | Require this exporter. Keep its section visible and report an error if it is unavailable or its response is not recognized. |
+| `disabled` | Never request or collect this exporter's metrics.                                                                           |
 
 Discovery runs at startup and repeats with metrics refreshes. Starting an exporter later makes its metrics appear automatically; an unavailable automatic exporter is retried without marking the host unhealthy. Other exporters continue to work when one fails. An exporter that reports an unhealthy pool still produces a health failure, even in `auto` mode.
 
@@ -163,24 +163,24 @@ Charts live at **`/history`**; the History tab appears in the topbar once enable
 
 **Recorded metrics:**
 
-| Series | Description |
-| --- | --- |
-| `pool/{name}/used_pct` | Pool used % |
-| `pool/{name}/alloc_bytes` | Pool allocated bytes |
-| `pool/{name}/free_bytes` | Pool free bytes |
-| `disk/{dev}/temp_c` | Disk temperature °C |
-| `disk/{dev}/wear_pct` | NVMe percentage used (wear) |
-| `disk/{dev}/wear_lvl` | SATA SSD wear leveling count |
-| `disk/{dev}/pow_hrs` | Power-on hours |
-| `system/node/cpu_pct` | CPU busy % (node_exporter) |
-| `system/node/iowait_pct` | CPU iowait % |
-| `system/node/mem_used_pct` | Memory used % (node_exporter) |
-| `system/node/swap_used_pct` | Swap used % |
-| `system/node/load1`, `load5`, `load15` | 1-, 5-, and 15-minute load averages |
-| `system/node/pressure_cpu_pct`, `pressure_io_pct`, `pressure_mem_pct` | CPU, IO, and memory pressure % |
-| `fs/{mount}/used_pct` | Filesystem usage %, excluding boot mounts |
-| `net/{interface}/rx_bps`, `tx_bps` | Receive and transmit bytes per second |
-| `temp/{chip label}/temp_c` | hwmon sensor temperature °C |
+| Series                                                                | Description                               |
+| --------------------------------------------------------------------- | ----------------------------------------- |
+| `pool/{name}/used_pct`                                                | Pool used %                               |
+| `pool/{name}/alloc_bytes`                                             | Pool allocated bytes                      |
+| `pool/{name}/free_bytes`                                              | Pool free bytes                           |
+| `disk/{dev}/temp_c`                                                   | Disk temperature °C                       |
+| `disk/{dev}/wear_pct`                                                 | NVMe percentage used (wear)               |
+| `disk/{dev}/wear_lvl`                                                 | SATA SSD wear leveling count              |
+| `disk/{dev}/pow_hrs`                                                  | Power-on hours                            |
+| `system/node/cpu_pct`                                                 | CPU busy % (node_exporter)                |
+| `system/node/iowait_pct`                                              | CPU iowait %                              |
+| `system/node/mem_used_pct`                                            | Memory used % (node_exporter)             |
+| `system/node/swap_used_pct`                                           | Swap used %                               |
+| `system/node/load1`, `load5`, `load15`                                | 1-, 5-, and 15-minute load averages       |
+| `system/node/pressure_cpu_pct`, `pressure_io_pct`, `pressure_mem_pct` | CPU, IO, and memory pressure %            |
+| `fs/{mount}/used_pct`                                                 | Filesystem usage %, excluding boot mounts |
+| `net/{interface}/rx_bps`, `tx_bps`                                    | Receive and transmit bytes per second     |
+| `temp/{chip label}/temp_c`                                            | hwmon sensor temperature °C               |
 
 HostGlance prunes data older than the retention window. Each data point stores 8 bytes of values: 30 days at a 5-minute interval across 50 disks × 4 metrics ≈ 14 MB raw, around 35 MB on disk with bbolt key and page overhead.
 
@@ -208,18 +208,18 @@ Hostnames and exporter URLs must be reachable from the container. `localhost` re
 
 ## API
 
-| Route | Purpose |
-| --- | --- |
-| `GET /`, `GET /system` | System overview for every configured host |
-| `GET /storage`, `GET /pools` | Available or required ZFS and SMART sections |
-| `GET /history` | History charts; requires `history.enabled: true` |
-| `GET /api/metrics` | Host metrics and exporter availability |
-| `GET /api/system` | System metrics for hosts with an available or explicitly enabled node exporter |
-| `GET /api/history/series` | List recorded series; history only |
-| `GET /api/history/query?key=&from=&to=&bucket=` | Query time-series data; history only |
-| `GET /api/health/:label` | Host health based on exporter requirements and pool health |
-| `GET /api/health/:label/:pool` | Pool health |
-| `GET /health` | App liveness, independent of exporter availability |
+| Route                                           | Purpose                                                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| `GET /`, `GET /system`                          | System overview for every configured host                                      |
+| `GET /storage`, `GET /pools`                    | Available or required ZFS and SMART sections                                   |
+| `GET /history`                                  | History charts; requires `history.enabled: true`                               |
+| `GET /api/metrics`                              | Host metrics and exporter availability                                         |
+| `GET /api/system`                               | System metrics for hosts with an available or explicitly enabled node exporter |
+| `GET /api/history/series`                       | List recorded series; history only                                             |
+| `GET /api/history/query?key=&from=&to=&bucket=` | Query time-series data; history only                                           |
+| `GET /api/health/:label`                        | Host health based on exporter requirements and pool health                     |
+| `GET /api/health/:label/:pool`                  | Pool health                                                                    |
+| `GET /health`                                   | App liveness, independent of exporter availability                             |
 
 `/api/metrics` includes an `exporters` object on each host with `node`, `zfs`, and `smartctl` statuses. Each status reports its `mode` and `available` state, plus an `error` when a required exporter fails. Automatic absence does not produce an error.
 
@@ -229,14 +229,14 @@ Scrape URLs are not exposed as exporter endpoints in the UI or API. Labels are p
 
 Health checks suit monitoring tools like Uptime Kuma. `GET /api/health/:label` returns:
 
-| Condition | HTTP status | Meaning |
-| --- | --- | --- |
-| Initial collection is still pending | `503` | `status: unknown`, `reason: discovery_pending` |
-| Any `enabled` exporter is unavailable | `503` | A configured requirement failed |
-| Available ZFS data contains an unhealthy pool or exceeds `max_usage_percent` | `503` | Storage is unhealthy, regardless of exporter mode |
-| ZFS is `enabled` but reports no pools | `503` | Required ZFS storage is missing (`no_pools`) |
-| No exporters are available and none are required | `200` | `status: unknown`, `reason: no_exporters_detected` |
-| Available exporters satisfy the checks above | `200` | `status: up` |
+| Condition                                                                    | HTTP status | Meaning                                            |
+| ---------------------------------------------------------------------------- | ----------- | -------------------------------------------------- |
+| Initial collection is still pending                                          | `503`       | `status: unknown`, `reason: discovery_pending`     |
+| Any `enabled` exporter is unavailable                                        | `503`       | A configured requirement failed                    |
+| Available ZFS data contains an unhealthy pool or exceeds `max_usage_percent` | `503`       | Storage is unhealthy, regardless of exporter mode  |
+| ZFS is `enabled` but reports no pools                                        | `503`       | Required ZFS storage is missing (`no_pools`)       |
+| No exporters are available and none are required                             | `200`       | `status: unknown`, `reason: no_exporters_detected` |
+| Available exporters satisfy the checks above                                 | `200`       | `status: up`                                       |
 
 An unknown host status is neutral; exporter discovery cannot prove whether the machine itself is healthy.
 

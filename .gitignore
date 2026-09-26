@@ -40,6 +40,9 @@ hostglance
 # Data
 /data/
 
+# Playwright MCP screenshots and snapshots
+/.playwright-mcp/
+
 # Air (live reload) build output
 /tmp/
 build-errors.log

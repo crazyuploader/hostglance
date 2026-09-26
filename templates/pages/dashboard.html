@@ -592,7 +592,7 @@
   <!-- Page header -->
   <div class="page-header animate-in">
     <h1 class="page-title">Storage Overview</h1>
-    <p class="page-sub">{{.TotalNodes}} host{{if gt .TotalNodes 1}}s{{end}} &middot; {{.TotalPools}} pool{{if gt .TotalPools 1}}s{{end}} &middot; {{.StorageErrors}} with exporter errors &middot; fetched {{.FetchedAt}}</p>
+    <p class="page-sub">{{plural .TotalNodes "host"}} &middot; {{plural .TotalPools "pool"}} &middot; fetched {{.FetchedAt}}</p>
   </div>
 
   <!-- KPI summary -->
@@ -715,7 +715,9 @@
       </div>
       <div class="node-meta">
         <div class="node-label-row">
-          <div class="node-label">{{$node.Label}}</div>
+          {{$title := hostTitle $node.Label $node.System}}
+          <div class="node-label">{{$title}}</div>
+          {{if ne $title $node.Label}}<div class="node-location">{{$node.Label}}</div>{{end}}
           {{if $node.Location}}<div class="node-location">{{$node.Location}}</div>{{end}}
         </div>
         <div class="node-url-row">
@@ -735,7 +737,7 @@
         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
-      <span>ZFS: {{$node.Exporters.ZFS.Error}}</span>
+      <span>Required ZFS exporter {{$node.Exporters.ZFS.Error}}</span>
     </div>
     {{else if and $node.Exporters.ZFS.Visible (not $node.Pools)}}
     <div class="empty">
@@ -756,7 +758,7 @@
     {{end}}
 
     {{if $node.Exporters.Smartctl.Error}}
-    <div class="node-zfs-err">Disk health: {{$node.Exporters.Smartctl.Error}}</div>
+    <div class="node-zfs-err">Required SMART exporter {{$node.Exporters.Smartctl.Error}}</div>
     {{else if and $node.Exporters.Smartctl.Visible (not $node.Disks)}}
     <div class="empty"><h3>No disks reported</h3><p>The disk health exporter returned no disk metrics.</p></div>
     {{end}}
@@ -1157,8 +1159,8 @@
   if (overlay)   overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
-  /* ── Animate usage bars ── */
-  if (!prefersReducedMotion) {
+  /* ── Animate usage bars (not on refresh reloads) ── */
+  if (!prefersReducedMotion && !document.documentElement.classList.contains('no-anim')) {
     document.querySelectorAll('.bar-fill[data-width]').forEach(function (el) {
       const target = el.getAttribute('data-width') + '%';
       requestAnimationFrame(function () {
