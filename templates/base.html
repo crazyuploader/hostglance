@@ -18,6 +18,7 @@ try { if (sessionStorage.getItem('hostglance:ui:' + location.pathname)) document
 <body{{block "body-attrs" .}}{{end}}>
 {{template "topbar" .}}
 {{block "content" .}}{{end}}
+{{template "footer" .}}
 {{template "shared_js" .}}
 {{block "scripts" .}}{{end}}
 </body>
