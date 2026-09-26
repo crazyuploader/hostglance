@@ -70,7 +70,7 @@
   function saveState() {
     try {
       var open = Array.prototype.map.call(
-        document.querySelectorAll('[aria-expanded="true"]'),
+        document.querySelectorAll('[aria-expanded="true"], details[open]'),
         function (el) { return el.id; }
       ).filter(Boolean);
       sessionStorage.setItem(stateKey, JSON.stringify({ y: window.scrollY, open: open }));
@@ -89,7 +89,8 @@
       var st = JSON.parse(raw);
       (st.open || []).forEach(function (id) {
         var el = document.getElementById(id);
-        if (el && setOpen) setOpen(el, true);
+        if (el && el.tagName === 'DETAILS') el.open = true;
+        else if (el && setOpen) setOpen(el, true);
       });
       if (st.y) window.scrollTo(0, st.y);
     } catch (_) {}

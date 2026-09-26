@@ -98,6 +98,31 @@ var realFSTypes = map[string]bool{
 // loopback plus Proxmox guest-facing virtual devices.
 var skipNetPrefixes = []string{"veth", "tap", "fwbr", "fwpr", "fwln"}
 
+// virtualNetPrefixes mark container and overlay interfaces (Docker, Kubernetes
+// CNIs). They are still collected, but the UI folds them behind an expander.
+// ponytail: name heuristic; node_exporter has no reliable "virtual" flag.
+var virtualNetPrefixes = []string{"br-", "docker", "cali", "flannel", "cni", "kube-", "vxlan", "cilium", "virbr", "lxcbr"}
+
+// Virtual reports whether the interface is a container or overlay device.
+func (n NetDev) Virtual() bool {
+	for _, p := range virtualNetPrefixes {
+		if strings.HasPrefix(n.Name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// PhysicalNets returns interfaces shown by default: NICs, host bridges, VPNs.
+func (s *SystemInfo) PhysicalNets() []NetDev {
+	return slices.DeleteFunc(slices.Clone(s.Nets), NetDev.Virtual)
+}
+
+// VirtualNets returns container and overlay interfaces.
+func (s *SystemInfo) VirtualNets() []NetDev {
+	return slices.DeleteFunc(slices.Clone(s.Nets), func(n NetDev) bool { return !n.Virtual() })
+}
+
 func skipNetDevice(name string) bool {
 	if name == "lo" {
 		return true

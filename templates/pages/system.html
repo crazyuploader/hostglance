@@ -38,6 +38,14 @@
   border-left: 3px solid color-mix(in oklab, var(--primary) 40%, var(--border));
 }
 @media (min-width: 768px) { .sys-card.sys-card-guest { margin-left: var(--space-8); } }
+.net-virtual { margin-top: var(--space-3); }
+.net-virtual summary {
+  cursor: pointer; color: var(--text-muted); font-size: var(--text-sm);
+  padding: var(--space-1) 0; list-style-position: inside;
+}
+.net-virtual summary:hover { color: var(--text); }
+.net-virtual summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.net-virtual[open] summary { margin-bottom: var(--space-2); }
 .sys-guest-of { color: var(--text-muted); font-size: var(--text-sm); }
 .sys-card.sys-card-error {
   border-color: color-mix(in oklab, var(--error) 28%, transparent);
@@ -328,18 +336,16 @@
       <div class="sys-block">
         <div class="sys-block-label">Network</div>
         <div class="sys-rows">
-          {{range .Nets}}
-          <div class="sys-row">
-            <span class="sys-row-name">{{.Name}}</span>
-            {{if .HasRates}}
-            <span class="sys-row-val">&darr;&nbsp;<b>{{fmtRate .RxBps}}</b></span>
-            <span class="sys-row-val">&uarr;&nbsp;<b>{{fmtRate .TxBps}}</b></span>
-            {{else}}
-            <span class="sys-row-val sys-dim">rates warming up</span>
-            {{end}}
-          </div>
-          {{end}}
+          {{range .PhysicalNets}}{{template "net-row" .}}{{end}}
         </div>
+        {{with .VirtualNets}}
+        <details class="net-virtual" id="net-virtual-{{$i}}">
+          <summary>{{plural (len .) "container/overlay interface"}}</summary>
+          <div class="sys-rows">
+            {{range .}}{{template "net-row" .}}{{end}}
+          </div>
+        </details>
+        {{end}}
       </div>
       {{end}}
 
@@ -367,6 +373,18 @@
 
 <!-- auto-refresh progress bar -->
 <div id="rbar" aria-hidden="true"></div>
+{{end}}
+
+{{define "net-row"}}
+<div class="sys-row">
+  <span class="sys-row-name">{{.Name}}</span>
+  {{if .HasRates}}
+  <span class="sys-row-val">&darr;&nbsp;<b>{{fmtRate .RxBps}}</b></span>
+  <span class="sys-row-val">&uarr;&nbsp;<b>{{fmtRate .TxBps}}</b></span>
+  {{else}}
+  <span class="sys-row-val sys-dim">rates warming up</span>
+  {{end}}
+</div>
 {{end}}
 
 {{define "scripts"}}

@@ -164,3 +164,26 @@ node_filesystem_avail_bytes{device="tank",fstype="zfs",mountpoint="/tank"} 400
 		t.Fatalf("partial node_exporter metrics were discarded: %+v", sys)
 	}
 }
+
+func TestNetSplitFoldsContainerInterfaces(t *testing.T) {
+	var nets []NetDev
+	for _, name := range []string{"ens192", "vmbr0", "tailscale0", "wg0", "br-1f1d", "docker0", "cali12ab", "flannel.1", "kube-bridge"} {
+		nets = append(nets, NetDev{Name: name})
+	}
+	sys := &SystemInfo{Nets: nets}
+	names := func(ns []NetDev) (out []string) {
+		for _, n := range ns {
+			out = append(out, n.Name)
+		}
+		return out
+	}
+	if got := strings.Join(names(sys.PhysicalNets()), ","); got != "ens192,vmbr0,tailscale0,wg0" {
+		t.Errorf("physical = %s", got)
+	}
+	if got := len(sys.VirtualNets()); got != 5 {
+		t.Errorf("virtual count = %d, want 5", got)
+	}
+	if len(sys.Nets) != 9 {
+		t.Error("split mutated Nets")
+	}
+}
