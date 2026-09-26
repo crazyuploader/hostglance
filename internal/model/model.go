@@ -504,7 +504,7 @@ func finalizePool(p *Pool) {
 }
 
 // HumanBytes returns a human-readable byte string using IEC units
-// (e.g. "3.72 TiB") — the divisor is 1024, so the labels say so.
+// (for example "3.72 TiB"). The divisor is 1024, so the labels say so.
 func HumanBytes(b float64) string {
 	const unit = 1024.0
 	units := []string{"KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}

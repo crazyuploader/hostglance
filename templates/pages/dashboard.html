@@ -1,4 +1,4 @@
-{{define "title"}}HostGlance — Storage{{end}}
+{{define "title"}}HostGlance · Storage{{end}}
 
 {{define "body-attrs"}} data-reload-on-refresh{{end}}
 
@@ -596,7 +596,7 @@
   </div>
 
   <!-- KPI summary -->
-  {{if not .Nodes}}<div class="empty"><h3>No storage exporters detected</h3><p>Storage appears when ZFS or disk health metrics are available.</p></div>{{end}}
+  {{if not .Nodes}}<div class="empty"><h3>No storage exporters detected</h3><p>A host shows here when it reports ZFS or SMART metrics.</p></div>{{end}}
 
   <div class="kpi-row animate-in animate-in-delayed-1" role="region" aria-label="Fleet summary">
     <div class="kpi">
@@ -1021,7 +1021,7 @@
 
   /* ── Collapsible toggles ──
      setOpen(trigger, open) is the single code path for opening/closing any
-     collapsible — used by click handlers AND by state restore after reload. */
+     collapsible. Click handlers and the state restore after a reload both use it. */
   function setOpen(trigger, nowOpen) {
     const id = trigger.id || '';
     trigger.setAttribute('aria-expanded', String(nowOpen));
@@ -1136,7 +1136,7 @@
       + ' · ' + pool.health;
 
     detailBody.innerHTML = (!pool.datasets || pool.datasets.length === 0)
-      ? '<div class="pool-detail-empty">No dataset metrics available for this pool.</div>'
+      ? '<div class="pool-detail-empty">This pool reported no dataset metrics.</div>'
       : '<div class="dataset-list">' + pool.datasets.map(renderDataset).join('') + '</div>';
 
     overlay.hidden = false;

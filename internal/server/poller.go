@@ -19,7 +19,7 @@ const (
 
 // runPoller fetches all hosts at the configured refresh interval and
 // broadcasts a reload to SSE clients after each fresh fetch. This makes the
-// server the single source of refresh signals — request handlers never
+// server the single source of refresh signals. Request handlers never
 // broadcast, so external API consumers cannot force browsers to reload.
 //
 // The interval is re-read from cfgPtr every cycle, so a SIGHUP config reload

@@ -1,4 +1,4 @@
-{{define "title"}}HostGlance — History{{end}}
+{{define "title"}}HostGlance · History{{end}}
 
 {{define "styles"}}
 <style>
@@ -69,7 +69,7 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .kind-body { display:none; flex-direction:column; gap:0.1rem; padding:0.15rem 0 0.15rem var(--space-2); }
 .kind-group.open .kind-body { display:flex; }
 
-/* Disk row — collapsible */
+/* Disk row, collapsible */
 .disk-group { display:flex; flex-direction:column; border-radius:var(--radius-md); overflow:hidden; margin-bottom:0.15rem; }
 .disk-toggle {
   display:flex; align-items:center; gap:var(--space-2); padding:0.3rem 0.4rem;
@@ -117,7 +117,7 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .chart-title { font-size:var(--text-sm); font-weight:600; color:var(--text-muted); }
 .chart-num { font-variant-numeric:tabular-nums; }
 
-/* Current-value readout — reuses the app's shared .kpi tile, same as the
+/* Current-value readout. Reuses the app's shared .kpi tile, same as the
    fleet summary rows on Pools/System, so History reads as one system. */
 .gauge-strip.kpi-row { margin-bottom:0; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); }
 .gauge-strip:empty { display:none; }
@@ -245,7 +245,7 @@ canvas#chart { display:block; width:100%; }
               <path d="M7 15l3-4 3 3 4-6"/>
             </svg>
             <h3>Nothing plotted yet</h3>
-            <p>Pick a disk or system metric from the left to see its history.</p>
+            <p>Select a metric on the left to show its history.</p>
           </div>
         </div>
         <canvas id="chart" style="display:none"></canvas>
@@ -328,13 +328,13 @@ canvas#chart { display:block; width:100%; }
     try {
       const res = await fetch('/api/history/series');
       if (!res.ok) {
-        document.getElementById('series-loading').textContent = 'Failed to load series (' + res.status + ').';
+        document.getElementById('series-loading').textContent = 'Could not load the series list (HTTP ' + res.status + ').';
         return;
       }
       allSeries = await res.json();
       buildTree();
     } catch (e) {
-      document.getElementById('series-loading').textContent = 'Failed to load series.';
+      document.getElementById('series-loading').textContent = 'Could not load the series list.';
     }
   }
 
@@ -343,7 +343,7 @@ canvas#chart { display:block; width:100%; }
     const tree = document.getElementById('series-tree');
     tree.innerHTML = '';
     if (!allSeries.length) {
-      tree.innerHTML = '<div class="series-empty">No history data yet.<br>Data is recorded on each refresh cycle.</div>';
+      tree.innerHTML = '<div class="series-empty">No history data yet.<br>HostGlance records a sample at each refresh.</div>';
       return;
     }
 
@@ -533,8 +533,8 @@ canvas#chart { display:block; width:100%; }
       empty.style.display = 'flex';
       empty.querySelector('h3').textContent = selected.size ? 'No data in this range' : 'Nothing plotted yet';
       empty.querySelector('p').textContent = selected.size
-        ? 'Try a wider time range, or give it a few refresh cycles to collect data.'
-        : 'Pick a disk or system metric from the left to see its history.';
+        ? 'Select a longer time range, or wait for more samples.'
+        : 'Select a metric on the left to show its history.';
       legendEl.innerHTML = '';
       gaugeStrip.innerHTML = '';
       titleEl.textContent = 'No metrics selected';

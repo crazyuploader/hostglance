@@ -13,7 +13,7 @@ import (
 
 var checkCmd = &cobra.Command{
 	Use:   "check",
-	Short: "Validate config and probe every host once",
+	Short: "Test the configuration and connect to each host one time",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if err := configInitError(); err != nil {
 			return fmt.Errorf("read config: %w", err)
@@ -23,11 +23,11 @@ var checkCmd = &cobra.Command{
 			return fmt.Errorf("config: %w", err)
 		}
 		if len(cfg.Hosts) == 0 {
-			return fmt.Errorf("no hosts configured; use --hosts, --endpoints, or config.yaml")
+			return fmt.Errorf("no hosts configured: add hosts to config.yaml, or use --hosts or --endpoints")
 		}
 		nodes := fetcher.New(cfg.Hosts, 0).Refresh(cmd.Context())
 		if failed := writeCheck(cmd.OutOrStdout(), nodes); failed > 0 {
-			return fmt.Errorf("%d host(s) missing required exporters", failed)
+			return fmt.Errorf("%d host(s) have a required exporter that did not respond", failed)
 		}
 		return nil
 	},

@@ -21,7 +21,7 @@ var serveCmd = &cobra.Command{
 			return fmt.Errorf("config: %w", err)
 		}
 		if len(cfg.Hosts) == 0 {
-			return fmt.Errorf("no hosts configured; use --hosts, --endpoints, or config.yaml")
+			return fmt.Errorf("no hosts configured: add hosts to config.yaml, or use --hosts or --endpoints")
 		}
 		return server.Start(cfg)
 	},

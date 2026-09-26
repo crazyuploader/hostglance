@@ -1,14 +1,14 @@
 # HostGlance
 
-Lightweight system and storage monitoring for your hosts, with a **HostGlance** dashboard. Configure hostnames or IP addresses; the app discovers [node_exporter](https://github.com/prometheus/node_exporter), [pdf/zfs_exporter](https://github.com/pdf/zfs_exporter), and [smartctl_exporter](https://github.com/prometheus-community/smartctl_exporter), then shows the available metrics.
+HostGlance is a dashboard for the system and storage health of your hosts. You give it hostnames or IP addresses. It finds [node_exporter](https://github.com/prometheus/node_exporter), [pdf/zfs_exporter](https://github.com/pdf/zfs_exporter), and [smartctl_exporter](https://github.com/prometheus-community/smartctl_exporter) on each host and shows the metrics that they report.
 
-ZFS is optional. Hosts with only system metrics or disk health work independently.
+ZFS is optional. A host that runs only node_exporter, or only smartctl_exporter, works on its own.
 
 ## Run
 
-Running from source requires Go 1.26.2 or later.
+To run from source, you need Go 1.26.2 or later.
 
-Create `config.yaml` with the hosts you want to monitor:
+Create a `config.yaml` file that lists the hosts to monitor:
 
 ```yaml
 hosts:
@@ -17,50 +17,54 @@ hosts:
   - 192.168.1.20
 ```
 
+Start the server:
+
 ```bash
 go run . serve --config config.yaml
 ```
 
-To validate the config and probe every host once without starting the server, run `go run . check --config config.yaml`. It prints which exporters each host has and exits non-zero if an exporter with `mode: enabled` is unreachable.
+Open `http://localhost:8054`. The System page shows every host in the configuration. The Storage page appears when a host reports ZFS or SMART metrics, or when you set one of these exporters to `mode: enabled`. A host with no exporters shows "No exporters detected."
 
-Open `http://localhost:8054`. The System page lists every configured host. Storage appears when ZFS or SMART metrics are available, or when either exporter is explicitly required. An empty host shows **No exporters detected**.
+To test the configuration without starting the server, run `go run . check --config config.yaml`. The command connects to each host one time and prints the exporters that it found. It exits with a non-zero code if an exporter with `mode: enabled` does not respond.
 
-For more settings, copy [config.yaml.example](config.yaml.example) to `config.yaml` and edit its hosts.
+For all settings, copy [config.yaml.example](config.yaml.example) to `config.yaml` and change the hosts.
 
 ### Flags
 
-- `--config`: Config file (searches `./config.yaml`, then `~/.config/hostglance/config.yaml` by default).
-- `--hosts`: Comma-separated or repeated hostnames or IP addresses, with automatic exporter discovery.
-- `--endpoints`: Legacy comma-separated or repeated ZFS exporter URLs; cannot be combined with `hosts`.
-- `--addr`: Address to listen on (default: `:8054`).
-- `--refresh`: Discovery and metrics refresh interval in seconds (default: `300`). The config file also accepts duration strings like `"5m"`.
-- `--debug`: Enable verbose debug logging.
-- `--trusted-proxies`: List of trusted proxy IPs for reverse proxy header support.
-- `--max-usage-percent`: Pool usage threshold for health failure (default: `0`, disabled).
-- `--log-format`: Log format, either `text` or `json` (default: `text`).
-- `--history-enabled`: Enable time-series history storage (default: `false`).
-- `--history-path`: Path to history database file (default: `./data/history.db`).
-- `--history-retention`: Retention period, e.g. `720h` for 30 days (default: `720h`).
-- `--history-record-interval`: How often to record history samples, e.g. `5m` (default: same as `--refresh`).
+- `--config`: The configuration file. By default, HostGlance reads `./config.yaml`, then `~/.config/hostglance/config.yaml`.
+- `--hosts`: Hostnames or IP addresses, separated by commas or given more than one time. HostGlance finds the exporters on each host.
+- `--endpoints`: The old format, a list of ZFS exporter URLs. You cannot use it together with `hosts`.
+- `--addr`: The address to listen on. The default is `:8054`.
+- `--refresh`: The time in seconds between two metric collections. The default is `300`. In the configuration file, you can also write a duration such as `"5m"`.
+- `--debug`: Write debug messages to the log.
+- `--trusted-proxies`: The IP addresses of reverse proxies whose forwarded headers HostGlance accepts.
+- `--max-usage-percent`: The pool usage above which a health check fails. The default is `0`, which turns the check off.
+- `--log-format`: The log format, `text` or `json`. The default is `text`.
+- `--history-enabled`: Record metrics for the history charts. The default is `false`.
+- `--history-path`: The file for the history database. The default is `./data/history.db`.
+- `--history-retention`: How long HostGlance keeps history, for example `720h` for 30 days. The default is `720h`.
+- `--history-record-interval`: The time between two history samples, for example `5m`. The default is the `--refresh` value.
 
-For example, `go run . serve --hosts nas.home,server02.home` configures two hosts. `HOSTGLANCE_HOSTS=nas.home,server02.home` provides the same list through the environment. Nested settings use underscores in environment variables, for example `HOSTGLANCE_HISTORY_ENABLED=true`. Flags take precedence over environment variables, which take precedence over file settings. Unknown settings, an invalid `log_format`, and a `max_usage_percent` outside 0–100 are rejected at startup. Use only one target format, `hosts` or `endpoints`, across all configuration sources.
+For example, `go run . serve --hosts nas.home,server02.home` monitors two hosts. The environment variable `HOSTGLANCE_HOSTS=nas.home,server02.home` gives the same list. For a nested setting, use an underscore, for example `HOSTGLANCE_HISTORY_ENABLED=true`.
 
-## Config
+A flag overrides an environment variable, and an environment variable overrides the configuration file. HostGlance does not start if the configuration has an unknown setting, a `log_format` other than `text` or `json`, or a `max_usage_percent` outside 0 to 100. Use only one host format, `hosts` or `endpoints`, in all sources together.
+
+## Configuration
 
 ```yaml
 addr: ":8054"
 refresh: 300
-cache_ttl: 30 # cache fetched metrics for 30 seconds
-max_usage_percent: 90 # fail health check if any pool > 90% full
+cache_ttl: 30 # reuse collected metrics for 30 seconds
+max_usage_percent: 90 # a health check fails if a pool is more than 90% full
 log_format: "text" # "text" or "json"
 debug: false
-trusted_proxies: [] # e.g., ["127.0.0.1", "100.64.0.0/10"]
+trusted_proxies: [] # for example ["127.0.0.1", "100.64.0.0/10"]
 
 history:
   enabled: false
   path: "./data/history.db"
-  retention: "720h" # 30 days; supports Go duration strings
-  record_interval: "5m" # sample frequency; defaults to refresh interval
+  retention: "720h" # 30 days, as a Go duration
+  record_interval: "5m" # the default is the refresh value
 
 hosts:
   - server02.home
@@ -69,11 +73,13 @@ hosts:
     location: Singapore
     exporters:
       zfs:
-        mode: enabled # required; an unavailable exporter produces an error
+        mode: enabled # required: an error shows if this exporter does not respond
       node:
-        mode: auto # optional; also the default when omitted
+        mode: auto # optional: this is also the default
       smartctl:
-        mode: disabled # do not probe or collect
+        mode: disabled # never connect to this exporter
+  - address: nas-vm.home
+    parent: node-1 # this VM runs on node-1
   - address: "2001:db8::20"
     label: node-2
     exporters:
@@ -82,37 +88,39 @@ hosts:
         # A custom URL alone keeps mode: auto.
 ```
 
-Entries can be bare hostnames/IP addresses or objects. `address` is a hostname or IP address without a scheme, port, or path; use exporter `url` overrides for those. Bare IPv6 addresses are supported. `label` defaults to `address` and must be unique. Choose stable labels because health URLs and history series use them.
+Each host is a hostname, an IP address, or an object. The `address` field is a hostname or IP address without a scheme, port, or path. To change the port, scheme, or path, set the `url` field of the exporter. You can write IPv6 addresses without brackets.
 
-Set `parent` to another host's label when a host is a VM or container running on it, for example `parent: pve01`. Guests appear indented under their parent on the System page and are left out of the fleet core, memory, and CPU totals so resources are not counted twice. Only one nesting level is supported.
+The `label` field is the name that HostGlance shows. It is the address by default, and each label must be unique. Health URLs and history data use the label, so do not change it after you start to record history.
+
+If a host is a VM or a container that runs on another host, set `parent` to the label of that other host, for example `parent: pve01`. HostGlance shows the guest below its parent on the System page. The fleet totals for cores, memory, and CPU do not include guests, because the parent already counts their resources. A guest cannot have its own guests.
 
 ### Exporter discovery
 
-Every unspecified exporter defaults to `auto`. Discovery checks known endpoints on the configured hosts and recognizes exporter-specific metric families:
+Each exporter that you do not configure uses `mode: auto`. HostGlance connects to the default URL of each exporter and looks for the metric names that the exporter writes:
 
-| Exporter   | Default endpoint             | Data                                                  |
+| Exporter   | Default URL                  | Data                                                  |
 | ---------- | ---------------------------- | ----------------------------------------------------- |
 | `node`     | `http://<host>:9100/metrics` | CPU, memory, load, network, filesystems, temperatures |
 | `zfs`      | `http://<host>:9134/metrics` | ZFS pools and datasets                                |
 | `smartctl` | `http://<host>:9633/metrics` | Disk health, temperature, wear                        |
 
-This does not scan your network or install exporters. The exporters must already be running and reachable from the app. Use `url` to override a port, scheme, or path, including HTTPS or a reverse proxy.
+HostGlance does not scan your network and does not install exporters. Each exporter must run already, and HostGlance must be able to connect to it. To use a different port, scheme, or path, or a reverse proxy, set the `url` field.
 
-| Mode       | Behavior                                                                                                                    |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `auto`     | Collect when a recognized exporter responds. Missing or unavailable exporters are silent and their sections are hidden.     |
-| `enabled`  | Require this exporter. Keep its section visible and report an error if it is unavailable or its response is not recognized. |
-| `disabled` | Never request or collect this exporter's metrics.                                                                           |
+| Mode       | What HostGlance does                                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `auto`     | Collects metrics when the exporter responds. If the exporter does not respond, HostGlance hides its section and shows no error.   |
+| `enabled`  | Requires the exporter. The section stays visible, and an error shows if the exporter does not respond or returns unknown metrics. |
+| `disabled` | Never connects to the exporter.                                                                                                   |
 
-Discovery runs at startup and repeats with metrics refreshes. Starting an exporter later makes its metrics appear automatically; an unavailable automatic exporter is retried without marking the host unhealthy. Other exporters continue to work when one fails. An exporter that reports an unhealthy pool still produces a health failure, even in `auto` mode.
+HostGlance looks for exporters at startup and again at each refresh. If you start an exporter later, its metrics appear at the next refresh. An `auto` exporter that stops responding does not mark the host as unhealthy. When one exporter fails, the other exporters on the host continue to work. An unhealthy pool fails the health check in every mode, `auto` included.
 
-### Migrate existing configuration
+### Move from the old endpoints format
 
-The `endpoints` format and `--endpoints` flag remain supported. A legacy entry's `url` is required ZFS; supplied `node_exporter_url` and `smartctl_url` values are optional. Omitted companion URLs do not trigger discovery probes.
+HostGlance still reads the `endpoints` format and the `--endpoints` flag. In that format, the `url` of each entry is a required ZFS exporter. The `node_exporter_url` and `smartctl_url` fields are optional. HostGlance does not look for exporters that an entry does not list.
 
-Legacy combined endpoints continue to collect SMART metrics bundled into the ZFS response. When bundled SMART metrics are found, the public SMART status can be `mode: auto`, `available: true` without a separate `smartctl_url`. New `hosts` entries collect each source independently and always honor `smartctl.mode: disabled`.
+Some old ZFS URLs also returned SMART metrics in the same response. HostGlance still reads those SMART metrics for `endpoints` entries. In that case, the SMART status shows `mode: auto` and `available: true`, even without a `smartctl_url`. A `hosts` entry collects each exporter on its own, and `smartctl.mode: disabled` always stops SMART collection.
 
-For example, this existing entry:
+For example, change this old entry:
 
 ```yaml
 endpoints:
@@ -122,7 +130,7 @@ endpoints:
     node_exporter_url: "http://nas.home:9100/metrics"
 ```
 
-can become:
+to this entry:
 
 ```yaml
 hosts:
@@ -136,122 +144,127 @@ hosts:
         mode: disabled
 ```
 
-This preserves the original requirements and skips SMART collection. Remove the `smartctl` override to discover SMART metrics too, or change ZFS to `auto` to make it optional. Retain any custom exporter URLs when migrating. If the old ZFS URL also served SMART metrics, configure that same URL under `exporters.smartctl` with `mode: auto` to keep collecting them.
+The new entry keeps ZFS required and does not collect SMART metrics. To collect SMART metrics, remove the `smartctl` lines. To make ZFS optional, change its mode to `auto`. If the old entry had custom exporter URLs, copy them to the `url` fields. If the old ZFS URL also returned SMART metrics, set the same URL under `exporters.smartctl` with `mode: auto`.
 
-Remove the old `endpoints` setting, including any `--endpoints` flag or `HOSTGLANCE_ENDPOINTS` environment variable. Mixing it with `hosts` is rejected. Keep the same labels and `history.path` to continue existing history without a database conversion. If an old entry omitted `label`, its label was its ZFS URL; copy that value explicitly to preserve its history keys.
+Remove the old `endpoints` setting, the `--endpoints` flag, and the `HOSTGLANCE_ENDPOINTS` environment variable. HostGlance does not start when both formats are present. To keep your history, keep the same labels and the same `history.path`. If an old entry had no `label`, its label was its ZFS URL. Copy that URL to `label` to keep the history of that host.
 
-The executable is `hostglance`, the container image is `ghcr.io/crazyuploader/hostglance`, environment variables use the `HOSTGLANCE_*` prefix, and the default user config directory is `~/.config/hostglance`.
+The program is `hostglance`, and the container image is `ghcr.io/crazyuploader/hostglance`. Environment variables start with `HOSTGLANCE_`, and the default configuration directory is `~/.config/hostglance`.
 
-## System and Storage
+## System and Storage pages
 
-The **System** homepage (`/`, also available at `/system`) lists hosts and available system metrics:
+The System page (`/`, also at `/system`) shows each host and its system metrics:
 
-- CPU busy % and iowait, computed from consecutive scrapes; shows "warming up" until the second sample, normally within 30 seconds of startup
-- Pressure stall percentages (CPU / IO / memory PSI)
-- Memory usage, buffers/cache, swap
-- Load averages colored relative to core count
-- Filesystem usage, including ZFS mounts; skips tmpfs, fuse, and overlay mounts
-- Network throughput; skips loopback and Proxmox guest interfaces (`veth*`, `tap*`, `fwbr*`)
-- hwmon temperature sensors
-- OS, kernel, and uptime
+- CPU busy and iowait percentages. HostGlance needs two samples to calculate them, so they show "warming up" for about 30 seconds after startup.
+- Pressure stall percentages for CPU, I/O, and memory.
+- Memory, buffers and cache, and swap.
+- Load averages, colored against the number of cores.
+- Filesystem usage. HostGlance skips tmpfs, fuse, and overlay mounts. It shows ZFS mounts only when the host has no ZFS exporter, because the Storage page shows the pools.
+- Network throughput. HostGlance skips the loopback interface and Proxmox guest interfaces (`veth*`, `tap*`, `fwbr*`). Container and overlay interfaces, such as `br-*`, `docker0`, and `cali*`, go into a list that you can open.
+- hwmon temperature sensors.
+- The OS, the kernel, and the uptime.
 
-The **Storage** page (`/storage`, also available at `/pools`) shows ZFS pools and SMART disks independently. A host does not need ZFS to show disk health. Explicitly enabled exporters retain their error states when unavailable.
+The Storage page (`/storage`, also at `/pools`) shows ZFS pools and SMART disks. The two are separate, so a host without ZFS can still show disk health. An exporter with `mode: enabled` keeps its error visible when it does not respond.
 
 ## History
 
-When `history.enabled: true`, HostGlance records available pool, disk, and system metrics to a local [bbolt](https://github.com/etcd-io/bbolt) database, sampling every `history.record_interval` (defaults to `refresh`).
+When you set `history.enabled: true`, HostGlance records pool, disk, and system metrics in a local [bbolt](https://github.com/etcd-io/bbolt) database. It takes one sample at each `history.record_interval`, which is the `refresh` value by default.
 
-Charts live at **`/history`**; the History tab appears in the topbar once enabled. Previously recorded data remains available when an exporter disappears, until it expires under the retention setting.
+The charts are at `/history`. The History tab appears in the top bar when history is on. If an exporter stops, its recorded data stays until it is older than the retention period.
 
-**Recorded metrics:**
+HostGlance records these series:
 
-| Series                                                                | Description                               |
-| --------------------------------------------------------------------- | ----------------------------------------- |
-| `pool/{name}/used_pct`                                                | Pool used %                               |
-| `pool/{name}/alloc_bytes`                                             | Pool allocated bytes                      |
-| `pool/{name}/free_bytes`                                              | Pool free bytes                           |
-| `disk/{dev}/temp_c`                                                   | Disk temperature °C                       |
-| `disk/{dev}/wear_pct`                                                 | NVMe percentage used (wear)               |
-| `disk/{dev}/wear_lvl`                                                 | SATA SSD wear leveling count              |
-| `disk/{dev}/pow_hrs`                                                  | Power-on hours                            |
-| `system/node/cpu_pct`                                                 | CPU busy % (node_exporter)                |
-| `system/node/iowait_pct`                                              | CPU iowait %                              |
-| `system/node/mem_used_pct`                                            | Memory used % (node_exporter)             |
-| `system/node/swap_used_pct`                                           | Swap used %                               |
-| `system/node/load1`, `load5`, `load15`                                | 1-, 5-, and 15-minute load averages       |
-| `system/node/pressure_cpu_pct`, `pressure_io_pct`, `pressure_mem_pct` | CPU, IO, and memory pressure %            |
-| `fs/{mount}/used_pct`                                                 | Filesystem usage %, excluding boot mounts |
-| `net/{interface}/rx_bps`, `tx_bps`                                    | Receive and transmit bytes per second     |
-| `temp/{chip label}/temp_c`                                            | hwmon sensor temperature °C               |
+| Series                                                                | Description                             |
+| --------------------------------------------------------------------- | --------------------------------------- |
+| `pool/{name}/used_pct`                                                | Pool used %                             |
+| `pool/{name}/alloc_bytes`                                             | Pool allocated bytes                    |
+| `pool/{name}/free_bytes`                                              | Pool free bytes                         |
+| `disk/{dev}/temp_c`                                                   | Disk temperature °C                     |
+| `disk/{dev}/wear_pct`                                                 | NVMe percentage used (wear)             |
+| `disk/{dev}/wear_lvl`                                                 | SATA SSD wear leveling count            |
+| `disk/{dev}/pow_hrs`                                                  | Power-on hours                          |
+| `system/node/cpu_pct`                                                 | CPU busy %                              |
+| `system/node/iowait_pct`                                              | CPU iowait %                            |
+| `system/node/mem_used_pct`                                            | Memory used %                           |
+| `system/node/swap_used_pct`                                           | Swap used %                             |
+| `system/node/load1`, `load5`, `load15`                                | 1-, 5-, and 15-minute load averages     |
+| `system/node/pressure_cpu_pct`, `pressure_io_pct`, `pressure_mem_pct` | CPU, I/O, and memory pressure %         |
+| `fs/{mount}/used_pct`                                                 | Filesystem usage %, without boot mounts |
+| `net/{interface}/rx_bps`, `tx_bps`                                    | Receive and transmit bytes per second   |
+| `temp/{chip label}/temp_c`                                            | hwmon sensor temperature °C             |
 
-HostGlance prunes data older than the retention window. Each data point stores 8 bytes of values: 30 days at a 5-minute interval across 50 disks × 4 metrics ≈ 14 MB raw, around 35 MB on disk with bbolt key and page overhead.
+HostGlance deletes data that is older than the retention period. Each data point uses 8 bytes. For example, 50 disks with 4 metrics each, sampled every 5 minutes for 30 days, use about 14 MB of data and about 35 MB on disk.
 
-**Docker:** uncomment the `./data:/data` volume in `docker-compose.yml` and set `history.path: /data/history.db` in your config.
+To keep history in Docker, remove the comment from the `./data:/data` volume in `docker-compose.yml`. Then set `history.path: /data/history.db` in the configuration.
 
-## Hot Reload
+## Reload the configuration
 
-Edits to host lists, exporter modes and URLs, `refresh`, and `debug` reload automatically. To trigger a reload manually:
+HostGlance reloads the configuration when the file changes. A reload applies changes to hosts, exporter modes and URLs, `refresh`, and `debug`. To start a reload yourself, send `SIGHUP`:
 
 ```bash
 kill -HUP $(pgrep hostglance)
 ```
 
-Changes to `addr`, `cache_ttl`, `trusted_proxies`, or history settings require a restart; a reload logs a warning naming any such changed setting.
+Changes to `addr`, `cache_ttl`, `trusted_proxies`, or history settings apply only after a restart. If a reload finds a change to one of them, HostGlance writes a warning to the log.
 
 ## Docker
 
-Edit `config.yaml` (copy from `config.yaml.example`) before starting the stack:
+Copy `config.yaml.example` to `config.yaml` and change the hosts. Then start the stack:
 
 ```bash
 docker compose up -d
 ```
 
-Hostnames and exporter URLs must be reachable from the container. `localhost` refers to the container itself.
+The container must be able to connect to each host and exporter URL. Inside the container, `localhost` is the container itself, not the Docker host.
 
 ## API
 
-| Route                                           | Purpose                                                                        |
-| ----------------------------------------------- | ------------------------------------------------------------------------------ |
-| `GET /`, `GET /system`                          | System overview for every configured host                                      |
-| `GET /storage`, `GET /pools`                    | Available or required ZFS and SMART sections                                   |
-| `GET /history`                                  | History charts; requires `history.enabled: true`                               |
-| `GET /api/metrics`                              | Host metrics and exporter availability                                         |
-| `GET /api/system`                               | System metrics for hosts with an available or explicitly enabled node exporter |
-| `GET /api/history/series`                       | List recorded series; history only                                             |
-| `GET /api/history/query?key=&from=&to=&bucket=` | Query time-series data; history only                                           |
-| `GET /api/health/:label`                        | Host health based on exporter requirements and pool health                     |
-| `GET /api/health/:label/:pool`                  | Pool health                                                                    |
-| `GET /health`                                   | App liveness, independent of exporter availability                             |
+| Route                                           | Purpose                                                               |
+| ----------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /`, `GET /system`                          | The System page for all hosts                                         |
+| `GET /storage`, `GET /pools`                    | The Storage page for hosts with ZFS or SMART data                     |
+| `GET /history`                                  | History charts. Needs `history.enabled: true`.                        |
+| `GET /api/metrics`                              | Host metrics and exporter status                                      |
+| `GET /api/system`                               | System metrics for hosts whose node exporter responds or is `enabled` |
+| `GET /api/history/series`                       | The list of recorded series. Needs history.                           |
+| `GET /api/history/query?key=&from=&to=&bucket=` | Data for one series. Needs history.                                   |
+| `GET /api/health/:label`                        | Host health, from exporter requirements and pool health               |
+| `GET /api/health/:label/:pool`                  | Pool health                                                           |
+| `GET /health`                                   | Shows that the app runs. It does not depend on the exporters.         |
 
-`/api/metrics` includes an `exporters` object on each host with `node`, `zfs`, and `smartctl` statuses. Each status reports its `mode` and `available` state, plus an `error` when a required exporter fails. Automatic absence does not produce an error.
+In `/api/metrics`, each host has an `exporters` object with a status for `node`, `zfs`, and `smartctl`. Each status has a `mode` and an `available` value. It also has an `error` when an `enabled` exporter fails. An `auto` exporter that does not respond has no error.
 
-Scrape URLs are not exposed as exporter endpoints in the UI or API. Labels are public: legacy entries that defaulted their label to a URL continue to expose that label. SSE connections on `/events` cap at 64 concurrent clients.
+The UI and the API do not show exporter URLs. They do show labels, so an old `endpoints` entry whose label is its URL still shows that URL. The `/events` stream accepts at most 64 clients at the same time.
 
-### Health Checks
+### Health checks
 
-Health checks suit monitoring tools like Uptime Kuma. `GET /api/health/:label` returns:
+Monitoring tools such as Uptime Kuma can use the health checks. `GET /api/health/:label` returns:
 
-| Condition                                                                    | HTTP status | Meaning                                            |
-| ---------------------------------------------------------------------------- | ----------- | -------------------------------------------------- |
-| Initial collection is still pending                                          | `503`       | `status: unknown`, `reason: discovery_pending`     |
-| Any `enabled` exporter is unavailable                                        | `503`       | A configured requirement failed                    |
-| Available ZFS data contains an unhealthy pool or exceeds `max_usage_percent` | `503`       | Storage is unhealthy, regardless of exporter mode  |
-| ZFS is `enabled` but reports no pools                                        | `503`       | Required ZFS storage is missing (`no_pools`)       |
-| No exporters are available and none are required                             | `200`       | `status: unknown`, `reason: no_exporters_detected` |
-| Available exporters satisfy the checks above                                 | `200`       | `status: up`                                       |
+| Condition                                                      | HTTP status | Meaning                                            |
+| -------------------------------------------------------------- | ----------- | -------------------------------------------------- |
+| The first collection did not finish yet                        | `503`       | `status: unknown`, `reason: discovery_pending`     |
+| An `enabled` exporter does not respond                         | `503`       | A required exporter failed                         |
+| A pool is unhealthy, or its usage is above `max_usage_percent` | `503`       | Storage is unhealthy, in every exporter mode       |
+| ZFS is `enabled` but reports no pools                          | `503`       | Required ZFS storage is missing (`no_pools`)       |
+| No exporter responds, and none is required                     | `200`       | `status: unknown`, `reason: no_exporters_detected` |
+| All the checks above pass                                      | `200`       | `status: up`                                       |
 
-An unknown host status is neutral; exporter discovery cannot prove whether the machine itself is healthy.
+An `unknown` status is neutral. The exporters alone cannot show whether the machine is healthy.
 
-`GET /api/health/:label/:pool` also returns `503` with `status: unknown`, `reason: discovery_pending` while initial collection is pending. After collection, it returns `503` if ZFS is unavailable, the pool is missing or unhealthy, or its usage exceeds `max_usage_percent`. A failure in an unrelated node or SMART exporter does not fail a healthy pool check.
+`GET /api/health/:label/:pool` also returns `503` with `status: unknown` and `reason: discovery_pending` before the first collection finishes. After that, it returns `503` if ZFS does not respond, if the pool is missing or unhealthy, or if the pool usage is above `max_usage_percent`. A failure of the node or SMART exporter does not fail the check of a healthy pool.
 
-Examples: `GET /api/health/node-1` and `GET /api/health/node-1/tank`.
+For example: `GET /api/health/node-1` and `GET /api/health/node-1/tank`.
 
 ## Development
 
-Run the test suite, including race detection and shuffled test order:
+Run the tests with the race detector and in random order:
 
 ```bash
 go test -race -shuffle=on ./...
 ```
 
-For a local smoke test, configure a host with `node_exporter` only and use a short `refresh` interval. Confirm that the System metrics appear without a ZFS error. Stop and restart the exporter to check automatic disappearance and rediscovery, then set its mode to `enabled` and stop it again to check the visible error and `503` host health response.
+To test by hand, follow these steps:
+
+1. Configure one host that runs only `node_exporter`, and set a short `refresh` interval.
+2. Make sure that the System page shows the metrics and no ZFS error.
+3. Stop the exporter, then start it again. Make sure that its metrics go away and come back.
+4. Set the node exporter to `mode: enabled` and stop it. Make sure that the page shows an error and that the host health check returns `503`.

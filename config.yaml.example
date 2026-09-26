@@ -1,46 +1,47 @@
 addr: ":8054"
-refresh: 300 # seconds; duration strings also accepted, e.g. "5m"
-cache_ttl: 30 # cache fetched metrics for 30 seconds
-max_usage_percent: 90 # fail health check if any pool > 90% full
+refresh: 300 # seconds between two collections. "5m" also works.
+cache_ttl: 30 # reuse collected metrics for 30 seconds
+max_usage_percent: 90 # a health check fails if a pool is more than 90% full
 log_format: "text" # "text" or "json"
 debug: false
-trusted_proxies: [] # e.g., ["127.0.0.1", "100.64.0.0/10"]
+trusted_proxies: [] # for example ["127.0.0.1", "100.64.0.0/10"]
 
-# Records available system, pool, and disk metrics. Charts appear at /history.
+# Records system, pool, and disk metrics. The charts are at /history.
 history:
   enabled: false
-  path: "./data/history.db" # keep this path and host labels stable to retain history
+  path: "./data/history.db" # to keep history, do not change this path or the host labels
   retention: "720h" # 30 days
-  record_interval: "5m" # defaults to the refresh interval when omitted
+  record_interval: "5m" # the default is the refresh value
 
-# List hosts to monitor. Exporters must already be running and reachable.
-# Default /metrics ports: node 9100, zfs 9134, smartctl 9633.
-# Discovery repeats with each metrics refresh.
+# The hosts to monitor. Each exporter must run already, and HostGlance must be
+# able to connect to it. The default ports are node 9100, zfs 9134, and
+# smartctl 9633. HostGlance looks for exporters again at each refresh.
 hosts:
-  - server02.home # discover all supported exporters; absence is not an error
+  - server02.home # finds all exporters. A missing exporter is not an error.
   - address: nas.home
-    label: node-1 # optional; defaults to address; must be unique
+    label: node-1 # optional. The default is the address. Each label must be unique.
     location: Singapore
     exporters:
       zfs:
-        mode: enabled # required: report an error if unavailable
+        mode: enabled # required: an error shows if this exporter does not respond
       node:
-        mode: auto # default for every unspecified exporter
+        mode: auto # the default for each exporter that you do not configure
       smartctl:
-        mode: disabled # never probe or collect
+        mode: disabled # never connect to this exporter
   - address: nas-vm.home
-    parent: node-1 # label of the host this VM/container runs on; excluded from fleet totals
-  - address: "2001:db8::20" # bare IPv6 addresses are also supported
+    parent: node-1 # this VM runs on node-1. Fleet totals do not count it.
+  - address: "2001:db8::20" # you can write IPv6 addresses without brackets
     label: node-2
     exporters:
       node:
         url: "https://metrics.example.net/server02/node/metrics"
-        # Custom URLs support HTTPS, ports, and proxy paths.
-        # A URL override alone stays automatic; add mode: enabled to require it.
+        # A custom URL can set HTTPS, a port, or a proxy path.
+        # A custom URL alone keeps mode: auto. To require it, add mode: enabled.
 
-# Existing endpoints entries and --endpoints remain supported, but cannot be
-# combined with hosts, --hosts, or HOSTGLANCE_HOSTS. Legacy url requires ZFS;
-# supplied companion URLs are optional, and omitted URLs get no extra probes.
-# Legacy ZFS endpoints can still supply bundled SMART metrics; new hosts entries
-# collect SMART only through their smartctl source and respect mode: disabled.
-# See README.md for a migration example that preserves labels and history.
+# HostGlance still reads the old endpoints format and the --endpoints flag.
+# You cannot use them together with hosts, --hosts, or HOSTGLANCE_HOSTS.
+# In the old format, the url is a required ZFS exporter, and the other URLs are
+# optional. HostGlance does not look for exporters that an entry does not list.
+# An old ZFS URL can also return SMART metrics. A hosts entry reads SMART only
+# from its smartctl exporter, and mode: disabled stops it.
+# README.md shows how to move to hosts and keep your labels and history.

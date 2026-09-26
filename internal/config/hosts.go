@@ -101,7 +101,7 @@ func loadHosts(v *viper.Viper) ([]Host, error) {
 		case host.Parent == host.Label:
 			return nil, fmt.Errorf("host %q cannot be its own parent", host.Label)
 		case grandparent != "":
-			return nil, fmt.Errorf("host %q: parent %q is itself a guest; only one nesting level is supported", host.Label, host.Parent)
+			return nil, fmt.Errorf("host %q: parent %q is itself a guest, and only one nesting level is supported", host.Label, host.Parent)
 		}
 	}
 	return hosts, nil
@@ -148,7 +148,7 @@ func normalizeHost(host *Host) error {
 	_, ipErr := netip.ParseAddr(host.Address)
 	badHostname := strings.ContainsAny(host.Address, ":/\\?#@[]") || strings.ContainsFunc(host.Address, unicode.IsSpace)
 	if ipErr != nil && badHostname {
-		return fmt.Errorf("address must be a hostname or IP; use exporter url for custom ports and paths")
+		return fmt.Errorf("address must be a hostname or IP address without a port or path: set the exporter url for a custom port or path")
 	}
 	host.Label = cmp.Or(strings.TrimSpace(host.Label), host.Address)
 	host.Parent = strings.TrimSpace(host.Parent)

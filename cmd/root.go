@@ -17,8 +17,8 @@ var initConfigErr error
 
 var rootCmd = &cobra.Command{
 	Use:           "hostglance",
-	Short:         "System and storage monitoring with host discovery",
-	Long:          `Discover node, ZFS, and SMART exporters on configured hosts and serve a live system and storage dashboard.`,
+	Short:         "Monitor the system and storage health of your hosts",
+	Long:          `HostGlance finds node, ZFS, and SMART exporters on the configured hosts and serves a live dashboard of their system and storage metrics.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -35,19 +35,19 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default ./config.yaml)")
-	rootCmd.PersistentFlags().StringSlice("endpoints", nil, "ZFS exporter /metrics URLs (comma-separated or repeated)")
-	rootCmd.PersistentFlags().StringSlice("hosts", nil, "hostnames or IPs to discover (comma-separated or repeated)")
-	rootCmd.PersistentFlags().String("addr", ":8054", "listen address")
-	rootCmd.PersistentFlags().Int("refresh", 300, "auto-refresh interval in seconds")
-	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
-	rootCmd.PersistentFlags().StringSlice("trusted-proxies", nil, "list of trusted proxy IPs")
-	rootCmd.PersistentFlags().Float64("max-usage-percent", 0, "usage threshold for health failure (0 to disable)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "configuration file (default ./config.yaml, then ~/.config/hostglance/config.yaml)")
+	rootCmd.PersistentFlags().StringSlice("endpoints", nil, "old format: ZFS exporter /metrics URLs, separated by commas or repeated")
+	rootCmd.PersistentFlags().StringSlice("hosts", nil, "hostnames or IP addresses to monitor, separated by commas or repeated")
+	rootCmd.PersistentFlags().String("addr", ":8054", "address to listen on")
+	rootCmd.PersistentFlags().Int("refresh", 300, "seconds between two metric collections")
+	rootCmd.PersistentFlags().Bool("debug", false, "write debug messages to the log")
+	rootCmd.PersistentFlags().StringSlice("trusted-proxies", nil, "IP addresses or CIDR ranges of trusted reverse proxies")
+	rootCmd.PersistentFlags().Float64("max-usage-percent", 0, "pool usage percent above which health checks fail (0 turns the check off)")
 	rootCmd.PersistentFlags().String("log-format", "text", "log format (text or json)")
-	rootCmd.PersistentFlags().Bool("history-enabled", false, "enable time-series history storage")
-	rootCmd.PersistentFlags().String("history-path", "./data/history.db", "path to history database file")
-	rootCmd.PersistentFlags().Duration("history-retention", 0, "history retention period (e.g. 720h = 30 days; 0 uses config default)")
-	rootCmd.PersistentFlags().Duration("history-record-interval", 0, "how often to record history samples (e.g. 5m; 0 uses refresh interval)")
+	rootCmd.PersistentFlags().Bool("history-enabled", false, "record metrics for the history charts")
+	rootCmd.PersistentFlags().String("history-path", "./data/history.db", "file for the history database")
+	rootCmd.PersistentFlags().Duration("history-retention", 0, "how long to keep history, for example 720h for 30 days (0 uses the configuration value)")
+	rootCmd.PersistentFlags().Duration("history-record-interval", 0, "time between two history samples, for example 5m (0 uses the refresh interval)")
 
 	mustBindPFlag("endpoints", "endpoints")
 	mustBindPFlag("hosts", "hosts")

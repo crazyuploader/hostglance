@@ -1,4 +1,4 @@
-{{define "title"}}HostGlance — System{{end}}
+{{define "title"}}HostGlance · System{{end}}
 
 {{define "body-attrs"}} data-reload-on-refresh{{end}}
 
@@ -169,7 +169,7 @@
       <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>
     </svg>
     <h3>No hosts configured</h3>
-    <p>Add hosts to config.yaml to discover system and storage metrics.</p>
+    <p>Add hosts to config.yaml. HostGlance then finds their exporters.</p>
   </div>
   {{else}}
 
@@ -187,23 +187,23 @@
     </div>
     <div class="kpi">
       <div class="kpi-label">Avg CPU</div>
-      <div class="kpi-val {{if .HasCPU}}{{if pctClass .AvgCPUPct}}{{pctClass .AvgCPUPct}}{{else}}ok{{end}}{{else}}neutral{{end}}">{{if .HasCPU}}{{printf "%.0f%%" .AvgCPUPct}}{{else}}&mdash;{{end}}</div>
+      <div class="kpi-val {{if .HasCPU}}{{if pctClass .AvgCPUPct}}{{pctClass .AvgCPUPct}}{{else}}ok{{end}}{{else}}neutral{{end}}">{{if .HasCPU}}{{printf "%.0f%%" .AvgCPUPct}}{{else}}n/a{{end}}</div>
       <div class="kpi-hint">busy</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Memory</div>
-      <div class="kpi-val neutral">{{if gt .MemTotal 0.0}}{{printf "%.0f%%" (mul100 (percent .MemUsedBytes .MemTotal))}}{{else}}&mdash;{{end}}</div>
+      <div class="kpi-val neutral">{{if gt .MemTotal 0.0}}{{printf "%.0f%%" (mul100 (percent .MemUsedBytes .MemTotal))}}{{else}}n/a{{end}}</div>
       <div class="kpi-hint">{{humanBytes .MemUsedBytes}} / {{humanBytes .MemTotal}}</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Hottest</div>
-      <div class="kpi-val {{if gt .MaxTempC 0.0}}{{if gt .MaxTempC 55.0}}bad{{else if gt .MaxTempC 45.0}}warn{{else}}ok{{end}}{{else}}neutral{{end}}">{{if gt .MaxTempC 0.0}}{{printf "%.0f" .MaxTempC}}&deg;C{{else}}&mdash;{{end}}</div>
+      <div class="kpi-val {{if gt .MaxTempC 0.0}}{{if gt .MaxTempC 55.0}}bad{{else if gt .MaxTempC 45.0}}warn{{else}}ok{{end}}{{else}}neutral{{end}}">{{if gt .MaxTempC 0.0}}{{printf "%.0f" .MaxTempC}}&deg;C{{else}}n/a{{end}}</div>
       <div class="kpi-hint">sensor</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Errors</div>
       <div class="kpi-val {{if gt .ExporterErrors 0}}bad{{else}}neutral{{end}}">{{.ExporterErrors}}</div>
-      <div class="kpi-hint">hosts with required exporters down</div>
+      <div class="kpi-hint">hosts with a failed required exporter</div>
     </div>
   </div>
 
@@ -235,7 +235,7 @@
     {{end}}
     {{if and (not $node.System) (not $node.Error)}}
     <div class="sys-discovery">
-      {{if $node.FetchedAt.IsZero}}Discovering exporters…{{else if $node.Exporters.AnyAvailable}}No system metrics reported.{{else if $node.Exporters.HasErrors}}No system exporter detected.{{else}}No exporters detected.{{end}}
+      {{if $node.FetchedAt.IsZero}}Looking for exporters…{{else if $node.Exporters.AnyAvailable}}No system metrics reported.{{else if $node.Exporters.HasErrors}}No system exporter detected.{{else}}No exporters detected.{{end}}
     </div>
     {{end}}
 
@@ -272,7 +272,7 @@
         </div>
         {{else}}
         <div>
-          <span class="sys-big sys-dim">&mdash;</span>
+          <span class="sys-big sys-dim">n/a</span>
           <span class="sys-big-sub">{{.Cores}} cores &middot; rates warming up</span>
         </div>
         {{end}}
@@ -406,7 +406,7 @@
     fills.forEach(function (el) { el.style.width = el.getAttribute('data-width') + '%'; });
   }
 
-  /* Refresh progress bar — one update per second is plenty */
+  /* Refresh progress bar. One update per second is enough. */
   const REFRESH_MS = {{.RefreshSecs}} * 1000;
   const rbar = document.getElementById('rbar');
   if (rbar && !prefersReducedMotion) {

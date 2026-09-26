@@ -118,7 +118,7 @@ func Start(cfg *config.Config) error {
 	f := fetcher.New(cfg.Hosts, cfg.CacheTTL)
 	hub := newHub()
 
-	// Graceful shutdown context — cancelled on SIGTERM/SIGINT.
+	// Graceful shutdown context, cancelled on SIGTERM/SIGINT.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -216,7 +216,7 @@ func setupHistory(ctx context.Context, cfg *config.Config, f *fetcher.Fetcher) *
 	}
 	histStore, err := history.Open(cfg.History.Path, cfg.History.Retention)
 	if err != nil {
-		slog.Error("history store failed to open — history disabled", "error", err, "path", cfg.History.Path)
+		slog.Error("history store did not open, so history is off", "error", err, "path", cfg.History.Path)
 		cfg.History.Enabled = false
 		return nil
 	}
