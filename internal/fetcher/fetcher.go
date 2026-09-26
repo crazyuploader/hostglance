@@ -315,7 +315,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData
 	nd.Disks = model.ExtractDisks(smartctl.samples)
 	nd.SmartctlInfo = model.ExtractSmartctlInfo(smartctl.samples)
 
-	problems := []string{}
+	var problems []string
 	for _, source := range []struct {
 		name   string
 		status model.ExporterStatus

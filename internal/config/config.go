@@ -77,7 +77,7 @@ func parseFlexDuration(v any, def time.Duration) time.Duration {
 
 // Load reads viper state into a validated Config.
 func Load() (*Config, error) {
-	return load(viper.GetViper())
+	return loadFrom(viper.GetViper())
 }
 
 // knownKeys lists every accepted setting; anything else is a typo.
@@ -87,7 +87,7 @@ var knownKeys = []string{
 	"history.enabled", "history.path", "history.retention", "history.record_interval",
 }
 
-func load(v *viper.Viper) (*Config, error) {
+func loadFrom(v *viper.Viper) (*Config, error) {
 	for _, key := range v.AllKeys() {
 		if !slices.Contains(knownKeys, key) {
 			return nil, fmt.Errorf("unknown setting %q", key)

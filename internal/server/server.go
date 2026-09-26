@@ -192,7 +192,7 @@ func watchConfigReload(sigs <-chan os.Signal, f *fetcher.Fetcher, cfgPtr *atomic
 
 // restartOnlyChanges names settings that are read once at startup.
 func restartOnlyChanges(old, cur *config.Config) []string {
-	changed := []string{}
+	var changed []string
 	if old.Addr != cur.Addr {
 		changed = append(changed, "addr")
 	}
@@ -540,7 +540,7 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 	views := nodeViews(storage)
 	d := templateData{
 		Nodes:      views,
-		NodesJSON:  template.JS(toJSON(views)), //nolint:gosec // JSON is escaped for inline scripts
+		NodesJSON:  template.JS(toJSON(views)), //nolint:gosec // skipcq: GSC-G203 -- json.Marshal escapes <, >, & for inline scripts
 		FetchedAt:  time.Now().Format("15:04:05"),
 		TotalNodes: len(views),
 	}
@@ -613,8 +613,8 @@ func healthResponse(c fiber.Ctx, node *model.NodeData, label, poolName string, c
 }
 
 func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *config.Config) error {
-	badPools := []string{}
-	overThreshold := []string{}
+	badPools := []string{} // skipcq: GO-W1027 -- JSON must encode [] not null
+	var overThreshold []string
 	for _, pool := range node.Pools {
 		if pool.Health != model.HealthOnline {
 			badPools = append(badPools, pool.Name)

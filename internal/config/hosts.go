@@ -87,7 +87,7 @@ func loadHosts(v *viper.Viper) ([]Host, error) {
 // decodeList accepts structured YAML, hostname/URL lists, and comma-separated
 // flag/environment values. Strict decoding catches misspelled exporter settings.
 func decodeList[T any](raw any, shorthand string) ([]T, error) {
-	out := []T{}
+	var out []T
 	if raw == nil {
 		return out, nil
 	}

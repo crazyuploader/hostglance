@@ -16,9 +16,10 @@ func configFromYAML(t *testing.T, text string) (*Config, error) {
 	if err := v.ReadConfig(strings.NewReader(text)); err != nil {
 		t.Fatalf("read test config: %v", err)
 	}
-	return load(v)
+	return loadFrom(v)
 }
 
+// skipcq: GO-R1005 -- one assertion block per resolved host field
 func TestLoadHosts(t *testing.T) {
 	t.Parallel()
 	cfg, err := configFromYAML(t, `hosts:
@@ -131,14 +132,14 @@ func TestLoadHostsFlagsAndEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("HOSTGLANCE_HOSTS", "env-one,env-two")
-	cfg, err := load(v)
+	cfg, err := loadFrom(v)
 	if err != nil || len(cfg.Hosts) != 2 || cfg.Hosts[0].Label != "env-one" {
 		t.Fatalf("environment did not override config: cfg=%+v err=%v", cfg, err)
 	}
 	if err := flags.Parse([]string{"--hosts", "flag-one,flag-two"}); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err = load(v)
+	cfg, err = loadFrom(v)
 	if err != nil || len(cfg.Hosts) != 2 || cfg.Hosts[0].Label != "flag-one" {
 		t.Fatalf("flag did not override environment: cfg=%+v err=%v", cfg, err)
 	}
@@ -155,7 +156,7 @@ func TestLoadLegacyEndpointFlag(t *testing.T) {
 	if err := flags.Parse([]string{"--endpoints", "http://one/metrics,http://two/metrics"}); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := load(v)
+	cfg, err := loadFrom(v)
 	if err != nil || len(cfg.Hosts) != 2 {
 		t.Fatalf("legacy --endpoints failed: cfg=%+v err=%v", cfg, err)
 	}
