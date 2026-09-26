@@ -61,6 +61,7 @@ type nodeView struct {
 type systemView struct {
 	Label     string                 `json:"label"`
 	Location  string                 `json:"location,omitempty"`
+	Parent    string                 `json:"parent,omitempty"`
 	FetchedAt time.Time              `json:"fetched_at"`
 	Error     string                 `json:"error,omitempty"`
 	System    *model.SystemInfo      `json:"system,omitempty"`
@@ -77,6 +78,7 @@ type systemPageData struct {
 
 	// Fleet KPI aggregates
 	TotalNodes     int
+	GuestNodes     int // hosts with a parent; excluded from resource totals
 	ExporterErrors int
 	TotalCores     int
 	AvgCPUPct      float64
@@ -99,8 +101,17 @@ func buildSystemPageData(views []systemView) systemPageData {
 		if v.Exporters.HasErrors() {
 			d.ExporterErrors++
 		}
+		if v.Parent != "" {
+			d.GuestNodes++
+		}
 		if v.System == nil {
 			continue
+		}
+		for _, t := range v.System.Temps {
+			d.MaxTempC = max(d.MaxTempC, t.Celsius)
+		}
+		if v.Parent != "" {
+			continue // the parent already counts the guest's cores and memory
 		}
 		s := v.System
 		d.TotalCores += s.Cores
@@ -109,11 +120,6 @@ func buildSystemPageData(views []systemView) systemPageData {
 		if s.HasCPURates {
 			cpuSum += s.CPUBusyPct
 			cpuN++
-		}
-		for _, t := range s.Temps {
-			if t.Celsius > d.MaxTempC {
-				d.MaxTempC = t.Celsius
-			}
 		}
 	}
 	if cpuN > 0 {
@@ -135,11 +141,20 @@ func systemViews(nodes []model.NodeData) []systemView {
 }
 
 // hostViews keeps all configured hosts on the homepage, including hosts for
-// which automatic discovery has not found any exporters yet.
+// which automatic discovery has not found any exporters yet. Guests follow
+// their parent; otherwise configuration order is kept.
 func hostViews(nodes []model.NodeData) []systemView {
 	out := make([]systemView, 0, len(nodes))
 	for _, node := range nodes {
+		if node.Parent != "" {
+			continue
+		}
 		out = append(out, hostView(node))
+		for _, guest := range nodes {
+			if guest.Parent == node.Label {
+				out = append(out, hostView(guest))
+			}
+		}
 	}
 	return out
 }
@@ -158,6 +173,7 @@ func hostView(node model.NodeData) systemView {
 	return systemView{
 		Label:     node.Label,
 		Location:  node.Location,
+		Parent:    node.Parent,
 		FetchedAt: node.FetchedAt,
 		Error:     node.Exporters.Node.Error,
 		System:    sys,

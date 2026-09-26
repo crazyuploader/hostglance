@@ -84,6 +84,8 @@ hosts:
 
 Entries can be bare hostnames/IP addresses or objects. `address` is a hostname or IP address without a scheme, port, or path; use exporter `url` overrides for those. Bare IPv6 addresses are supported. `label` defaults to `address` and must be unique. Choose stable labels because health URLs and history series use them.
 
+Set `parent` to another host's label when a host is a VM or container running on it, for example `parent: pve01`. Guests appear indented under their parent on the System page and are left out of the fleet core, memory, and CPU totals so resources are not counted twice. Only one nesting level is supported.
+
 ### Exporter discovery
 
 Every unspecified exporter defaults to `auto`. Discovery checks known endpoints on the configured hosts and recognizes exporter-specific metric families:

@@ -32,6 +32,13 @@
 }
 @media (min-width: 480px) { .sys-card { padding: var(--space-5); } }
 .sys-card:hover { border-color: var(--border-hi); }
+/* Guests (VMs/containers) sit indented under their parent host. */
+.sys-card.sys-card-guest {
+  margin-left: var(--space-4);
+  border-left: 3px solid color-mix(in oklab, var(--primary) 40%, var(--border));
+}
+@media (min-width: 768px) { .sys-card.sys-card-guest { margin-left: var(--space-8); } }
+.sys-guest-of { color: var(--text-muted); font-size: var(--text-sm); }
 .sys-card.sys-card-error {
   border-color: color-mix(in oklab, var(--error) 28%, transparent);
 }
@@ -163,12 +170,12 @@
     <div class="kpi">
       <div class="kpi-label">Hosts</div>
       <div class="kpi-val neutral">{{.TotalNodes}}</div>
-      <div class="kpi-hint">configured</div>
+      <div class="kpi-hint">{{if .GuestNodes}}incl. {{plural .GuestNodes "guest"}}{{else}}configured{{end}}</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Cores</div>
       <div class="kpi-val neutral">{{.TotalCores}}</div>
-      <div class="kpi-hint">total</div>
+      <div class="kpi-hint">{{if .GuestNodes}}excl. guests{{else}}total{{end}}</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Avg CPU</div>
@@ -193,11 +200,12 @@
   </div>
 
   {{range $i, $node := .Nodes}}
-  <section class="sys-card {{if $node.Exporters.HasErrors}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">
+  <section class="sys-card {{if $node.Parent}}sys-card-guest{{end}} {{if $node.Exporters.HasErrors}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">
 
     <div class="sys-head">
       {{$title := hostTitle $node.Label $node.System}}
       <div class="sys-hostname">{{$title}}</div>
+      {{if $node.Parent}}<div class="sys-guest-of">on {{$node.Parent}}</div>{{end}}
       {{if ne $title $node.Label}}<div class="sys-location">{{$node.Label}}</div>{{end}}
       {{if $node.Location}}<div class="sys-location">{{$node.Location}}</div>{{end}}
       <div class="sys-head-spacer"></div>

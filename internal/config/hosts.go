@@ -42,9 +42,12 @@ type Exporters struct {
 // Host is a stable display/history identity with optional metrics sources.
 // After Load, all exporter modes and active URLs are resolved.
 type Host struct {
-	Address   string    `mapstructure:"address"`
-	Label     string    `mapstructure:"label"`
-	Location  string    `mapstructure:"location"`
+	Address  string `mapstructure:"address"`
+	Label    string `mapstructure:"label"`
+	Location string `mapstructure:"location"`
+	// Parent is the label of the host this one runs on (a VM or container).
+	// Guests are excluded from fleet totals so resources are not counted twice.
+	Parent    string    `mapstructure:"parent"`
 	Exporters Exporters `mapstructure:"exporters"`
 	// LegacyCombinedMetrics preserves disk metrics bundled into old ZFS endpoints.
 	LegacyCombinedMetrics bool `mapstructure:"-"`
@@ -81,6 +84,25 @@ func loadHosts(v *viper.Viper) ([]Host, error) {
 			return nil, fmt.Errorf("duplicate host label %q", host.Label)
 		}
 		labels[host.Label] = true
+	}
+	parents := make(map[string]string, len(hosts))
+	for _, host := range hosts {
+		parents[host.Label] = host.Parent
+	}
+	for _, host := range hosts {
+		if host.Parent == "" {
+			continue
+		}
+		// ponytail: one nesting level; deeper chains only matter for nested virtualization.
+		grandparent, ok := parents[host.Parent]
+		switch {
+		case !ok:
+			return nil, fmt.Errorf("host %q: parent %q is not a configured host label", host.Label, host.Parent)
+		case host.Parent == host.Label:
+			return nil, fmt.Errorf("host %q cannot be its own parent", host.Label)
+		case grandparent != "":
+			return nil, fmt.Errorf("host %q: parent %q is itself a guest; only one nesting level is supported", host.Label, host.Parent)
+		}
 	}
 	return hosts, nil
 }
@@ -129,6 +151,7 @@ func normalizeHost(host *Host) error {
 		return fmt.Errorf("address must be a hostname or IP; use exporter url for custom ports and paths")
 	}
 	host.Label = cmp.Or(strings.TrimSpace(host.Label), host.Address)
+	host.Parent = strings.TrimSpace(host.Parent)
 	sources := []struct {
 		name string
 		port string

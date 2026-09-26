@@ -410,3 +410,28 @@ func TestHostTitleAndPlural(t *testing.T) {
 		t.Error("plural formatting wrong")
 	}
 }
+
+func TestGuestsFollowParentAndSkipTotals(t *testing.T) {
+	t.Parallel()
+	sys := func(cores int, mem float64) *model.SystemInfo {
+		return &model.SystemInfo{Cores: cores, MemTotal: mem, MemAvailable: mem / 2}
+	}
+	nodes := []model.NodeData{
+		{Label: "vm1", Parent: "pve", System: sys(2, 4)},
+		{Label: "pve", System: sys(8, 32)},
+		{Label: "other", System: sys(4, 8)},
+		{Label: "vm2", Parent: "pve", System: sys(2, 4)},
+	}
+	views := hostViews(nodes)
+	var order []string
+	for _, v := range views {
+		order = append(order, v.Label)
+	}
+	if got := strings.Join(order, ","); got != "pve,vm1,vm2,other" {
+		t.Errorf("order = %s", got)
+	}
+	d := buildSystemPageData(views)
+	if d.TotalNodes != 4 || d.GuestNodes != 2 || d.TotalCores != 12 || d.MemTotal != 40 {
+		t.Errorf("totals: nodes=%d guests=%d cores=%d mem=%v", d.TotalNodes, d.GuestNodes, d.TotalCores, d.MemTotal)
+	}
+}

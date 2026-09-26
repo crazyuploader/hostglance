@@ -28,6 +28,8 @@ hosts:
         mode: auto # default for every unspecified exporter
       smartctl:
         mode: disabled # never probe or collect
+  - address: nas-vm.home
+    parent: node-1 # label of the host this VM/container runs on; excluded from fleet totals
   - address: "2001:db8::20" # bare IPv6 addresses are also supported
     label: node-2
     exporters:

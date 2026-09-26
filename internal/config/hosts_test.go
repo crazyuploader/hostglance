@@ -82,6 +82,9 @@ func TestLoadHostsValidation(t *testing.T) {
 		{name: "legacy missing URL", yaml: "endpoints: [{label: nas}]", want: "missing url"},
 		{name: "numeric host", yaml: "hosts: [42]", want: "decode"},
 		{name: "null host", yaml: "hosts: [null]", want: "missing address"},
+		{name: "unknown parent", yaml: "hosts: [{address: vm, parent: pve}]", want: "not a configured host label"},
+		{name: "self parent", yaml: "hosts: [{address: vm, parent: vm}]", want: "own parent"},
+		{name: "nested guest", yaml: "hosts: [pve, {address: vm, parent: pve}, {address: ct, parent: vm}]", want: "only one nesting level"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -171,5 +174,16 @@ func TestExampleConfig(t *testing.T) {
 	cfg, err := configFromYAML(t, string(data))
 	if err != nil || len(cfg.Hosts) == 0 {
 		t.Fatalf("example config does not load: cfg=%+v err=%v", cfg, err)
+	}
+}
+
+func TestLoadHostParent(t *testing.T) {
+	t.Parallel()
+	cfg, err := configFromYAML(t, "hosts: [{address: 10.0.0.1, label: pve}, {address: 10.0.0.2, parent: ' pve '}]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Hosts[0].Parent != "" || cfg.Hosts[1].Parent != "pve" {
+		t.Fatalf("parents = %q, %q", cfg.Hosts[0].Parent, cfg.Hosts[1].Parent)
 	}
 }

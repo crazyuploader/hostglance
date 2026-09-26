@@ -68,6 +68,7 @@ func pendingHosts(hosts []config.Host) []model.NodeData {
 		out[i] = model.NodeData{
 			Label:    host.Label,
 			Location: host.Location,
+			Parent:   host.Parent,
 			Exporters: model.ExporterStatuses{
 				Node:     model.ExporterStatus{Mode: string(host.Exporters.Node.Mode)},
 				ZFS:      model.ExporterStatus{Mode: string(host.Exporters.ZFS.Mode)},
@@ -306,6 +307,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData
 	nd := model.NodeData{
 		Label:     host.Label,
 		Location:  host.Location,
+		Parent:    host.Parent,
 		FetchedAt: time.Now(),
 		Exporters: model.ExporterStatuses{
 			Node: node.status, ZFS: zfs.status, Smartctl: smartctl.status,

@@ -127,6 +127,7 @@ type SmartctlInfo struct {
 type NodeData struct {
 	Label        string           `json:"label"`
 	Location     string           `json:"location,omitempty"`
+	Parent       string           `json:"parent,omitempty"`
 	FetchedAt    time.Time        `json:"fetched_at"`
 	Error        string           `json:"error,omitempty"`
 	Exporters    ExporterStatuses `json:"exporters"`
