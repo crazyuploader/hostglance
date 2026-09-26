@@ -1,4 +1,4 @@
-{{define "title"}}ZFS Dashboard — System{{end}}
+{{define "title"}}HostGlance — System{{end}}
 
 {{define "body-attrs"}} data-reload-on-refresh{{end}}
 
@@ -134,6 +134,8 @@
 .temp-chip.cool b { color: var(--success); }
 .temp-chip.warm b { color: var(--warning); }
 .temp-chip.hot  b { color: var(--error); }
+.sys-storage, .sys-discovery { padding: var(--space-4) var(--space-5); color: var(--text-muted); font-size: var(--text-sm); }
+.sys-storage a { color: var(--accent); }
 </style>
 {{end}}
 
@@ -142,7 +144,7 @@
 
   <div class="page-header animate-in">
     <h1 class="page-title">System Overview</h1>
-    <p class="page-sub">{{.TotalNodes}} node{{if gt .TotalNodes 1}}s{{end}} &middot; {{.TotalCores}} cores &middot; {{.Unreachable}} unreachable &middot; fetched {{.FetchedAt}}</p>
+    <p class="page-sub">{{plural .TotalNodes "host"}} &middot; {{plural .TotalCores "core"}} &middot; fetched {{.FetchedAt}}</p>
   </div>
 
   {{if not .Nodes}}
@@ -151,17 +153,17 @@
       <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>
       <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>
     </svg>
-    <h3>No node_exporter endpoints configured</h3>
-    <p>Add <code>node_exporter_url</code> to an endpoint in config.yaml to see CPU, memory, and system metrics here.</p>
+    <h3>No hosts configured</h3>
+    <p>Add hosts to config.yaml to discover system and storage metrics.</p>
   </div>
   {{else}}
 
   <!-- Fleet KPIs -->
   <div class="kpi-row animate-in animate-in-delayed-1" role="region" aria-label="Fleet system summary">
     <div class="kpi">
-      <div class="kpi-label">Nodes</div>
+      <div class="kpi-label">Hosts</div>
       <div class="kpi-val neutral">{{.TotalNodes}}</div>
-      <div class="kpi-hint">with node_exporter</div>
+      <div class="kpi-hint">configured</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Cores</div>
@@ -184,22 +186,24 @@
       <div class="kpi-hint">sensor</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Unreachable</div>
-      <div class="kpi-val {{if gt .Unreachable 0}}bad{{else}}neutral{{end}}">{{.Unreachable}}</div>
-      <div class="kpi-hint">exporters down</div>
+      <div class="kpi-label">Errors</div>
+      <div class="kpi-val {{if gt .ExporterErrors 0}}bad{{else}}neutral{{end}}">{{.ExporterErrors}}</div>
+      <div class="kpi-hint">hosts with required exporters down</div>
     </div>
   </div>
 
   {{range $i, $node := .Nodes}}
-  <section class="sys-card {{if $node.Error}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">
+  <section class="sys-card {{if $node.Exporters.HasErrors}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">
 
     <div class="sys-head">
-      <div class="sys-hostname">{{$node.Label}}</div>
+      {{$title := hostTitle $node.Label $node.System}}
+      <div class="sys-hostname">{{$title}}</div>
+      {{if ne $title $node.Label}}<div class="sys-location">{{$node.Label}}</div>{{end}}
       {{if $node.Location}}<div class="sys-location">{{$node.Location}}</div>{{end}}
       <div class="sys-head-spacer"></div>
       {{with $node.System}}
       <div class="sys-badges">
-        {{if and .Hostname (ne .Hostname $node.Label)}}<span class="sys-badge">host: {{.Hostname}}</span>{{end}}
+        {{if and .Hostname (ne .Hostname $title)}}<span class="sys-badge">host: {{.Hostname}}</span>{{end}}
         {{if .OSPretty}}<span class="sys-badge">{{.OSPretty}}</span>{{end}}
         {{if .Kernel}}<span class="sys-badge">{{.Kernel}}</span>{{end}}
         {{if gt .UptimeSecs 0.0}}<span class="sys-badge">up {{fmtUptime .UptimeSecs}}</span>{{end}}
@@ -208,6 +212,17 @@
       {{end}}
     </div>
 
+    {{if $node.Exporters.ZFS.Error}}<div class="sys-err">Required ZFS exporter {{$node.Exporters.ZFS.Error}}</div>{{end}}
+    {{if $node.Exporters.Smartctl.Error}}<div class="sys-err">Required SMART exporter {{$node.Exporters.Smartctl.Error}}</div>{{end}}
+    {{if or $node.PoolCount $node.DiskCount}}
+    <div class="sys-storage"><a href="/storage">Storage</a> &middot; {{plural $node.PoolCount "pool"}} &middot; {{plural $node.DiskCount "disk"}}</div>
+    {{end}}
+    {{if and (not $node.System) (not $node.Error)}}
+    <div class="sys-discovery">
+      {{if $node.FetchedAt.IsZero}}Discovering exporters…{{else if $node.Exporters.AnyAvailable}}No system metrics reported.{{else if $node.Exporters.HasErrors}}No system exporter detected.{{else}}No exporters detected.{{end}}
+    </div>
+    {{end}}
+
     {{if $node.Error}}
     <div class="sys-err">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -215,7 +230,7 @@
         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
-      <span>{{$node.Error}}</span>
+      <span>Required node exporter {{$node.Error}}</span>
     </div>
     {{else}}{{with $node.System}}
     <div class="sys-grid">
@@ -351,10 +366,11 @@
 (function () {
   'use strict';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const skipIntro = prefersReducedMotion || document.documentElement.classList.contains('no-anim');
 
   /* Animate bars */
   const fills = document.querySelectorAll('.bar-fill[data-width]');
-  if (!prefersReducedMotion) {
+  if (!skipIntro) {
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         fills.forEach(function (el) { el.style.width = el.getAttribute('data-width') + '%'; });
@@ -377,7 +393,7 @@
   }
 
   /* Restore scroll after reload (no collapsibles on this page) */
-  if (window.zfsdashRestore) window.zfsdashRestore(null);
+  if (window.hostglanceRestore) window.hostglanceRestore(null);
 })();
 </script>
 {{end}}

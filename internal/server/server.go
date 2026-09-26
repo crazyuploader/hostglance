@@ -1,4 +1,4 @@
-// Package server boots the Fiber v3 web server and serves the ZFS dashboard.
+// Package server boots the Fiber v3 web server and serves the system and storage dashboard.
 package server
 
 import (
@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,11 +19,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/crazyuploader/zfs-dash/internal/config"
-	"github.com/crazyuploader/zfs-dash/internal/fetcher"
-	"github.com/crazyuploader/zfs-dash/internal/history"
-	"github.com/crazyuploader/zfs-dash/internal/model"
-	"github.com/crazyuploader/zfs-dash/templates"
+	"github.com/crazyuploader/hostglance/internal/config"
+	"github.com/crazyuploader/hostglance/internal/fetcher"
+	"github.com/crazyuploader/hostglance/internal/history"
+	"github.com/crazyuploader/hostglance/internal/model"
+	"github.com/crazyuploader/hostglance/templates"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/logger"
@@ -88,15 +89,15 @@ const (
 // templateData is the data passed to the dashboard page template.
 type templateData struct {
 	pageData
-	Nodes            []model.NodeData
-	NodesJSON        template.JS // URL-stripped JSON for inline script
-	FetchedAt        string
-	TotalPools       int
-	UnreachableNodes int
-	HealthyPools     int
-	DegradedPools    int
-	ErroredPools     int
-	TotalNodes       int
+	Nodes         []nodeView
+	NodesJSON     template.JS // URL-stripped JSON for inline script
+	FetchedAt     string
+	TotalPools    int
+	StorageErrors int
+	HealthyPools  int
+	DegradedPools int
+	ErroredPools  int
+	TotalNodes    int
 }
 
 // historyData is the data passed to the history page template.
@@ -112,9 +113,9 @@ func Start(cfg *config.Config) error {
 	var cfgPtr atomic.Pointer[config.Config]
 	cfgPtr.Store(cfg)
 
-	slog.Debug("starting server in debug mode", "config", cfg)
+	slog.Debug("starting server in debug mode", "hosts", len(cfg.Hosts))
 
-	f := fetcher.New(cfg.Endpoints, cfg.CacheTTL)
+	f := fetcher.New(cfg.Hosts, cfg.CacheTTL)
 	hub := newHub()
 
 	// Graceful shutdown context — cancelled on SIGTERM/SIGINT.
@@ -154,7 +155,9 @@ func Start(cfg *config.Config) error {
 	registerDashboardRoute(app, f, pages["dashboard"], &cfgPtr, histStore)
 	registerSystemRoute(app, f, pages["system"], &cfgPtr, histStore)
 	if histStore != nil {
-		registerHistoryRoutes(app, rl, histStore, pages["history"], &cfgPtr)
+		registerHistoryRoutes(
+			app, rl, histStore, pages["history"], &cfgPtr, f,
+		)
 	}
 
 	app.Get("/health", func(c fiber.Ctx) error {
@@ -164,11 +167,11 @@ func Start(cfg *config.Config) error {
 	// Shutdown on SIGTERM/SIGINT
 	go shutdownOnSignal(shutdownSigs, ctx, cancel, app)
 
-	slog.Info("zfs-dash started", "url", fmt.Sprintf("http://localhost%s", cfg.Addr))
+	slog.Info("HostGlance started", "url", fmt.Sprintf("http://localhost%s", cfg.Addr))
 	return app.Listen(cfg.Addr)
 }
 
-// watchConfigReload reloads config and hot-swaps endpoints whenever sigs fires.
+// watchConfigReload reloads config and hot-swaps hosts whenever sigs fires.
 func watchConfigReload(sigs <-chan os.Signal, f *fetcher.Fetcher, cfgPtr *atomic.Pointer[config.Config]) {
 	for range sigs {
 		slog.Info("SIGHUP received, reloading config...")
@@ -177,11 +180,32 @@ func watchConfigReload(sigs <-chan os.Signal, f *fetcher.Fetcher, cfgPtr *atomic
 			slog.Error("config reload failed", "error", err)
 			continue
 		}
+		if changed := restartOnlyChanges(cfgPtr.Load(), newCfg); len(changed) > 0 {
+			slog.Warn("restart required to apply changed settings", "settings", changed)
+		}
 		setupLogger(newCfg)
-		f.SetEndpoints(newCfg.Endpoints)
+		f.SetHosts(newCfg.Hosts)
 		cfgPtr.Store(newCfg)
 		slog.Info("config reloaded successfully")
 	}
+}
+
+// restartOnlyChanges names settings that are read once at startup.
+func restartOnlyChanges(old, cur *config.Config) []string {
+	var changed []string
+	if old.Addr != cur.Addr {
+		changed = append(changed, "addr")
+	}
+	if old.CacheTTL != cur.CacheTTL {
+		changed = append(changed, "cache_ttl")
+	}
+	if old.History != cur.History {
+		changed = append(changed, "history")
+	}
+	if !slices.Equal(old.TrustedProxies, cur.TrustedProxies) {
+		changed = append(changed, "trusted_proxies")
+	}
+	return changed
 }
 
 // setupHistory opens the history store and starts its recorder when enabled.
@@ -208,7 +232,7 @@ func setupHistory(ctx context.Context, cfg *config.Config, f *fetcher.Fetcher) *
 
 func newFiberApp(cfg *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
-		AppName:      "zfs-dash",
+		AppName:      "HostGlance",
 		ReadTimeout:  httpReadTimeout,
 		WriteTimeout: 0, // Disable write timeout for SSE streams
 		IdleTimeout:  httpIdleTimeout,
@@ -306,7 +330,7 @@ func registerAPIRoutes(app *fiber.App, f *fetcher.Fetcher, rl fiber.Handler, cfg
 		defer cancel()
 		nodes, isCached := f.FetchAll(ctx)
 		setCacheHeaders(c, f, isCached)
-		return c.JSON(systemViews(nodes, cfgPtr.Load()))
+		return c.JSON(systemViews(nodes))
 	})
 
 	app.Get("/api/health/:label", rl, func(c fiber.Ctx) error {
@@ -321,14 +345,16 @@ func registerAPIRoutes(app *fiber.App, f *fetcher.Fetcher, rl fiber.Handler, cfg
 }
 
 func registerDashboardRoute(app *fiber.App, f *fetcher.Fetcher, tmpl *template.Template, cfgPtr *atomic.Pointer[config.Config], histStore *history.Store) {
-	app.Get("/", func(c fiber.Ctx) error {
+	handler := func(c fiber.Ctx) error {
 		curCfg := cfgPtr.Load()
 		reqCtx, cancel := context.WithTimeout(c.Context(), httpHandlerTimeout)
 		defer cancel()
 
 		nodes, isCached := f.FetchAll(reqCtx)
 		data := buildTemplateData(nodes)
-		data.pageData = newPageData("pools", curCfg, histStore != nil)
+		data.pageData = newPageData(
+			"storage", curCfg, histStore != nil, nodes,
+		)
 
 		setCacheHeaders(c, f, isCached)
 		c.Set("Cache-Control", "no-store")
@@ -340,18 +366,22 @@ func registerDashboardRoute(app *fiber.App, f *fetcher.Fetcher, tmpl *template.T
 
 		c.Set("Content-Type", "text/html; charset=utf-8")
 		return c.Send(buf.Bytes())
-	})
+	}
+	app.Get("/storage", handler)
+	app.Get("/pools", handler)
 }
 
 func registerSystemRoute(app *fiber.App, f *fetcher.Fetcher, tmpl *template.Template, cfgPtr *atomic.Pointer[config.Config], histStore *history.Store) {
-	app.Get("/system", func(c fiber.Ctx) error {
+	handler := func(c fiber.Ctx) error {
 		curCfg := cfgPtr.Load()
 		reqCtx, cancel := context.WithTimeout(c.Context(), httpHandlerTimeout)
 		defer cancel()
 
 		nodes, isCached := f.FetchAll(reqCtx)
-		data := buildSystemPageData(systemViews(nodes, curCfg))
-		data.pageData = newPageData("system", curCfg, histStore != nil)
+		data := buildSystemPageData(hostViews(nodes))
+		data.pageData = newPageData(
+			"system", curCfg, histStore != nil, nodes,
+		)
 
 		setCacheHeaders(c, f, isCached)
 		c.Set("Cache-Control", "no-store")
@@ -362,15 +392,26 @@ func registerSystemRoute(app *fiber.App, f *fetcher.Fetcher, tmpl *template.Temp
 		}
 		c.Set("Content-Type", "text/html; charset=utf-8")
 		return c.Send(buf.Bytes())
-	})
+	}
+	app.Get("/", handler)
+	app.Get("/system", handler)
 }
 
-func registerHistoryRoutes(app *fiber.App, rl fiber.Handler, histStore *history.Store, histTmpl *template.Template, cfgPtr *atomic.Pointer[config.Config]) {
+func registerHistoryRoutes(
+	app *fiber.App,
+	rl fiber.Handler,
+	histStore *history.Store,
+	histTmpl *template.Template,
+	cfgPtr *atomic.Pointer[config.Config],
+	f *fetcher.Fetcher,
+) {
 	app.Get("/history", func(c fiber.Ctx) error {
 		curCfg := cfgPtr.Load()
 		var buf bytes.Buffer
 		data := historyData{
-			pageData:       newPageData("history", curCfg, true),
+			pageData: newPageData(
+				"history", curCfg, true, f.Snapshot(),
+			),
 			RetentionHours: int(histStore.Retention().Hours()),
 		}
 		if err := histTmpl.ExecuteTemplate(&buf, "base", data); err != nil {
@@ -490,27 +531,26 @@ func setupLogger(cfg *config.Config) {
 }
 
 func buildTemplateData(nodes []model.NodeData) templateData {
-	// Node structs are copies (FetchAll returns a fresh outer slice), so
-	// sanitizing Error in place does not touch the fetcher cache.
-	for i := range nodes {
-		nodes[i].Error = sanitizeError(nodes[i].Error, nodes[i].URL)
-	}
-	nodesJSON, _ := json.Marshal(nodeViews(nodes))
-
-	d := templateData{
-		Nodes:      nodes,
-		NodesJSON:  template.JS(nodesJSON), //nolint:gosec // skipcq: GSC-G203 -- json.Marshal output is safe for inline JS
-		FetchedAt:  time.Now().Format("15:04:05"),
-		TotalNodes: len(nodes),
-		// pageData is set by the caller after buildTemplateData returns.
-	}
-	for _, n := range nodes {
-		if n.Error != "" {
-			d.UnreachableNodes++
+	storage := make([]model.NodeData, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Exporters.StorageVisible() {
+			storage = append(storage, node)
 		}
-		for _, p := range n.Pools {
+	}
+	views := nodeViews(storage)
+	d := templateData{
+		Nodes:      views,
+		NodesJSON:  template.JS(toJSON(views)), //nolint:gosec // skipcq: GSC-G203 -- json.Marshal escapes <, >, & for inline scripts
+		FetchedAt:  time.Now().Format("15:04:05"),
+		TotalNodes: len(views),
+	}
+	for _, node := range views {
+		if node.Exporters.ZFS.Error != "" || node.Exporters.Smartctl.Error != "" {
+			d.StorageErrors++
+		}
+		for _, pool := range node.Pools {
 			d.TotalPools++
-			switch p.Health {
+			switch pool.Health {
 			case model.HealthOnline:
 				d.HealthyPools++
 			case model.HealthDegraded:
@@ -541,12 +581,28 @@ func serveHealthCheck(c fiber.Ctx, f *fetcher.Fetcher, label, poolName string, c
 		})
 	}
 
-	if node.Error != "" {
-		slog.Debug("node has error", "label", label, "error", node.Error)
+	return healthResponse(c, node, label, poolName, cfg)
+}
+
+// healthResponse reports a fetched node; pool checks depend only on ZFS.
+func healthResponse(c fiber.Ctx, node *model.NodeData, label, poolName string, cfg *config.Config) error {
+	if node.FetchedAt.IsZero() {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-			"status":   "down",
-			"label":    node.Label,
-			"location": node.Location,
+			"status": "unknown", "reason": "discovery_pending", "label": node.Label,
+		})
+	}
+	failed := node.Exporters.HasErrors()
+	if poolName != "" {
+		failed = node.Exporters.ZFS.Error != ""
+	}
+	if failed {
+		slog.Debug("required exporter unavailable", "label", label)
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"status":    "down",
+			"reason":    "exporter_unavailable",
+			"label":     node.Label,
+			"location":  node.Location,
+			"exporters": node.Exporters,
 		})
 	}
 
@@ -557,7 +613,7 @@ func serveHealthCheck(c fiber.Ctx, f *fetcher.Fetcher, label, poolName string, c
 }
 
 func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *config.Config) error {
-	var badPools []string
+	badPools := []string{} // skipcq: GO-W1027 -- JSON must encode [] not null
 	var overThreshold []string
 	for _, pool := range node.Pools {
 		if pool.Health != model.HealthOnline {
@@ -571,7 +627,7 @@ func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *co
 	state := "up"
 	reason := ""
 	switch {
-	case len(node.Pools) == 0:
+	case node.Exporters.ZFS.Required() && len(node.Pools) == 0:
 		status = fiber.StatusServiceUnavailable
 		state = "no_pools"
 		slog.Debug("node has 0 pools", "label", label)
@@ -585,6 +641,9 @@ func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *co
 		state = "degraded"
 		reason = "pool_over_threshold"
 		slog.Debug("node has pools over threshold", "label", label, "pools", overThreshold, "threshold", cfg.MaxUsagePercent)
+	case !node.Exporters.AnyAvailable():
+		state = "unknown"
+		reason = "no_exporters_detected"
 	}
 
 	res := fiber.Map{
@@ -593,6 +652,7 @@ func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *co
 		"location":        node.Location,
 		"pool_count":      len(node.Pools),
 		"unhealthy_pools": badPools,
+		"exporters":       node.Exporters,
 	}
 	if reason != "" {
 		res["reason"] = reason
@@ -688,6 +748,8 @@ func funcMap() template.FuncMap {
 		"healthClass":    healthClass,
 		"fmtNodeTime":    fmtNodeTime,
 		"toJSON":         toJSON,
+		"hostTitle":      hostTitle,
+		"plural":         plural,
 		"fmtSpeed":       fmtSpeed,
 		"exitStatusDesc": exitStatusDesc,
 		"diskHasIssues":  diskHasIssues,

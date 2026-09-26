@@ -1,6 +1,6 @@
 {{define "topbar"}}
 <header class="topbar">
-  <a class="logo" href="/" aria-label="ZFS Dash home">
+  <a class="logo" href="/" aria-label="HostGlance home">
     <svg class="logo-svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
          stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
          aria-hidden="true">
@@ -11,12 +11,12 @@
       <circle cx="5.5" cy="13" r="0.9" fill="currentColor" stroke="none"/>
       <circle cx="5.5" cy="20" r="0.9" fill="currentColor" stroke="none"/>
     </svg>
-    <span class="logo-name">zfs-dash</span>
+    <span class="logo-name">HostGlance</span>
   </a>
 
   <nav class="nav-tabs" aria-label="Primary">
-    <a class="nav-tab{{if eq .ActiveTab "pools"}} active{{end}}" href="/"{{if eq .ActiveTab "pools"}} aria-current="page"{{end}}>Pools</a>
-    {{if .SystemEnabled}}<a class="nav-tab{{if eq .ActiveTab "system"}} active{{end}}" href="/system"{{if eq .ActiveTab "system"}} aria-current="page"{{end}}>System</a>{{end}}
+    <a class="nav-tab{{if eq .ActiveTab "system"}} active{{end}}" href="/"{{if eq .ActiveTab "system"}} aria-current="page"{{end}}>System</a>
+    {{if .StorageEnabled}}<a class="nav-tab{{if eq .ActiveTab "storage"}} active{{end}}" href="/storage"{{if eq .ActiveTab "storage"}} aria-current="page"{{end}}>Storage</a>{{end}}
     {{if .HistoryEnabled}}<a class="nav-tab{{if eq .ActiveTab "history"}} active{{end}}" href="/history"{{if eq .ActiveTab "history"}} aria-current="page"{{end}}>History</a>{{end}}
   </nav>
 

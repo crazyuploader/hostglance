@@ -1,4 +1,4 @@
-// Package templates embeds the HTML templates for zfs-dash pages.
+// Package templates embeds the HTML templates for the HostGlance pages.
 //
 // Layout: base.html defines the page shell, partials/ hold shared blocks
 // (design tokens, topbar, shared JS), and pages/ hold one file per page

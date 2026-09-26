@@ -1,4 +1,4 @@
-// Package model defines ZFS domain types and metric extraction logic.
+// Package model defines host, storage, and system metrics and their extraction.
 package model
 
 import (
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crazyuploader/zfs-dash/internal/parser"
+	"github.com/crazyuploader/hostglance/internal/parser"
 )
 
 // PoolHealth is the human-readable pool state.
@@ -123,18 +123,18 @@ type SmartctlInfo struct {
 	GoVersion       string `json:"go_version,omitempty"`
 }
 
-// NodeData holds all pool data fetched from one endpoint.
+// NodeData holds independently collected metrics for one configured host.
 type NodeData struct {
-	Label        string       `json:"label"`
-	Location     string       `json:"location,omitempty"`
-	URL          string       `json:"url"`
-	FetchedAt    time.Time    `json:"fetched_at"`
-	Error        string       `json:"error,omitempty"`
-	ExporterInfo ExporterInfo `json:"exporter_info,omitempty"`
-	SmartctlInfo SmartctlInfo `json:"smartctl_info,omitempty"`
-	Pools        []Pool       `json:"pools"`
-	Disks        []DiskInfo   `json:"disks,omitempty"`
-	System       *SystemInfo  `json:"system,omitempty"`
+	Label        string           `json:"label"`
+	Location     string           `json:"location,omitempty"`
+	FetchedAt    time.Time        `json:"fetched_at"`
+	Error        string           `json:"error,omitempty"`
+	Exporters    ExporterStatuses `json:"exporters"`
+	ExporterInfo ExporterInfo     `json:"exporter_info,omitempty"`
+	SmartctlInfo SmartctlInfo     `json:"smartctl_info,omitempty"`
+	Pools        []Pool           `json:"pools"`
+	Disks        []DiskInfo       `json:"disks,omitempty"`
+	System       *SystemInfo      `json:"system,omitempty"`
 }
 
 func healthFromValue(v float64) PoolHealth {

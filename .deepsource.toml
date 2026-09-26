@@ -5,7 +5,7 @@ name = "go"
 enabled = true
 
   [analyzers.meta]
-  import_root = "github.com/crazyuploader/zfs-dash"
+  import_root = "github.com/crazyuploader/hostglance"
 
 [[code_formatters]]
 name = "gofmt"

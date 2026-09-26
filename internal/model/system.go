@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crazyuploader/zfs-dash/internal/parser"
+	"github.com/crazyuploader/hostglance/internal/parser"
 )
 
-// FSInfo holds usage for one real (non-ZFS) filesystem mount.
+// FSInfo holds usage for one real filesystem mount.
 type FSInfo struct {
 	Device     string  `json:"device"`
 	FSType     string  `json:"fstype"`
@@ -86,12 +86,12 @@ type SystemInfo struct {
 	Counters *SystemCounters `json:"-"`
 }
 
-// realFSTypes are filesystem types shown on the system page. ZFS mounts are
-// covered by the pools view; tmpfs/fuse/overlay are noise.
+// realFSTypes are filesystem types shown on the system page. Include ZFS
+// mounts because a host need not have a separate ZFS exporter.
 var realFSTypes = map[string]bool{
 	"ext2": true, "ext3": true, "ext4": true,
 	"xfs": true, "btrfs": true, "vfat": true,
-	"f2fs": true, "ntfs": true,
+	"f2fs": true, "ntfs": true, "zfs": true,
 }
 
 // skipNetPrefixes are interface prefixes hidden from the network list:
@@ -130,8 +130,10 @@ func ExtractSystem(samples []parser.Sample) *SystemInfo {
 	tempVals := map[string]map[string]float64{} // chip -> sensor -> °C
 	chipNames := map[string]string{}            // chip -> friendly name
 	sensorLabels := map[string]map[string]string{}
+	recognized := false
 
 	for _, s := range samples {
+		recognized = recognized || strings.HasPrefix(s.Name, "node_")
 		switch s.Name {
 		case "node_cpu_seconds_total":
 			cores[s.Labels["cpu"]] = true
@@ -215,8 +217,7 @@ func ExtractSystem(samples []parser.Sample) *SystemInfo {
 		}
 	}
 
-	// Nothing recognizably node_exporter in the samples.
-	if sys.MemTotal == 0 && len(cores) == 0 && sys.Hostname == "" {
+	if !recognized {
 		return nil
 	}
 

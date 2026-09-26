@@ -6,23 +6,39 @@ log_format: "text" # "text" or "json"
 debug: false
 trusted_proxies: [] # e.g., ["127.0.0.1", "100.64.0.0/10"]
 
-# ── History (optional) ───────────────────────────────────
-# Records pool usage and disk temperature/wear over time.
-# Accessible at /history once enabled.
+# Records available system, pool, and disk metrics. Charts appear at /history.
 history:
   enabled: false
-  path: "./data/history.db"   # path to bbolt database file; directory created automatically
-  retention: "720h"           # how long to keep data (e.g. "720h" = 30 days, "2200h" = ~91 days)
-  record_interval: "5m"       # how often to record samples (default: same as refresh interval)
+  path: "./data/history.db" # keep this path and host labels stable to retain history
+  retention: "720h" # 30 days
+  record_interval: "5m" # defaults to the refresh interval when omitted
 
-endpoints:
-  - url: "http://host1:9134/metrics"
-    label: "node-1"
-    location: "Singapore"
-    smartctl_url: "http://host1:9633/metrics"       # optional: smartctl-exporter for disk health
-    node_exporter_url: "http://host1:9100/metrics"  # optional: node_exporter for the System tab (CPU/RAM/load/temps)
-  - url: "http://host2:9134/metrics"
-    label: "node-2"
-    location: "Mumbai"
-    # no smartctl_url — disk section will not appear for this node
-    # no node_exporter_url — node will not appear on the System tab
+# List hosts to monitor. Exporters must already be running and reachable.
+# Default /metrics ports: node 9100, zfs 9134, smartctl 9633.
+# Discovery repeats with each metrics refresh.
+hosts:
+  - server02.home # discover all supported exporters; absence is not an error
+  - address: nas.home
+    label: node-1 # optional; defaults to address; must be unique
+    location: Singapore
+    exporters:
+      zfs:
+        mode: enabled # required: report an error if unavailable
+      node:
+        mode: auto # default for every unspecified exporter
+      smartctl:
+        mode: disabled # never probe or collect
+  - address: "2001:db8::20" # bare IPv6 addresses are also supported
+    label: node-2
+    exporters:
+      node:
+        url: "https://metrics.example.net/server02/node/metrics"
+        # Custom URLs support HTTPS, ports, and proxy paths.
+        # A URL override alone stays automatic; add mode: enabled to require it.
+
+# Existing endpoints entries and --endpoints remain supported, but cannot be
+# combined with hosts, --hosts, or HOSTGLANCE_HOSTS. Legacy url requires ZFS;
+# supplied companion URLs are optional, and omitted URLs get no extra probes.
+# Legacy ZFS endpoints can still supply bundled SMART metrics; new hosts entries
+# collect SMART only through their smartctl source and respect mode: disabled.
+# See README.md for a migration example that preserves labels and history.

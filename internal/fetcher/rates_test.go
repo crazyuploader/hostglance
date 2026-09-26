@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crazyuploader/zfs-dash/internal/model"
+	"github.com/crazyuploader/hostglance/internal/model"
 )
 
 func snapshot(cpuTotal, cpuIdle, cpuIOWait, netRx, netTx float64) *model.SystemInfo {

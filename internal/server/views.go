@@ -1,80 +1,72 @@
 package server
 
 import (
-	"net/url"
+	"net/netip"
 	"slices"
-	"strings"
+	"strconv"
 	"time"
 
-	"github.com/crazyuploader/zfs-dash/internal/config"
-	"github.com/crazyuploader/zfs-dash/internal/model"
+	"github.com/crazyuploader/hostglance/internal/config"
+	"github.com/crazyuploader/hostglance/internal/model"
 )
 
 // pageData carries the fields every page template needs (topbar/nav state).
 // Page-specific data structs embed it.
 type pageData struct {
-	ActiveTab      string // "pools" | "system" | "history"
+	ActiveTab      string // "storage" | "system" | "history"
 	HistoryEnabled bool
-	SystemEnabled  bool
+	StorageEnabled bool
 	RefreshSecs    int
 }
 
 // newPageData builds the shared page fields for the given active tab.
-func newPageData(tab string, cfg *config.Config, historyEnabled bool) pageData {
-	return pageData{
+func newPageData(
+	tab string,
+	cfg *config.Config,
+	historyEnabled bool,
+	nodes []model.NodeData,
+) pageData {
+	data := pageData{
 		ActiveTab:      tab,
 		HistoryEnabled: historyEnabled,
-		SystemEnabled:  systemConfigured(cfg),
 		RefreshSecs:    int(cfg.Refresh.Seconds()),
 	}
-}
-
-// systemConfigured reports whether any endpoint has a node_exporter URL.
-func systemConfigured(cfg *config.Config) bool {
-	return slices.ContainsFunc(cfg.Endpoints, func(ep config.Endpoint) bool {
-		return ep.NodeExporterURL != ""
-	})
-}
-
-// sanitizeError removes the scrape URL (and its host:port, which net errors
-// embed separately, e.g. "dial tcp host:port") from fetch error messages so
-// internal addresses are not exposed to browsers or API consumers.
-func sanitizeError(msg, rawURL string) string {
-	if msg == "" || rawURL == "" {
-		return msg
+	for _, node := range nodes {
+		if node.Exporters.StorageVisible() {
+			data.StorageEnabled = true
+			break
+		}
 	}
-	msg = strings.ReplaceAll(msg, `"`+rawURL+`"`, "endpoint")
-	msg = strings.ReplaceAll(msg, rawURL, "endpoint")
-	if u, err := url.Parse(rawURL); err == nil && u.Host != "" {
-		msg = strings.ReplaceAll(msg, u.Host, "endpoint")
-	}
-	return msg
+	return data
 }
 
 // nodeView is the browser-facing subset of NodeData, used both for the
 // page's inline JS and the /api/metrics response.
-// URL is intentionally excluded so internal scrape endpoints are never
-// exposed to browsers or API consumers.
+// Scrape URLs stay in config and are never exposed to browsers or API consumers.
 type nodeView struct {
-	Label        string             `json:"label"`
-	Location     string             `json:"location,omitempty"`
-	FetchedAt    time.Time          `json:"fetched_at"`
-	Error        string             `json:"error,omitempty"`
-	ExporterInfo model.ExporterInfo `json:"exporter_info,omitempty"`
-	SmartctlInfo model.SmartctlInfo `json:"smartctl_info,omitempty"`
-	Pools        []model.Pool       `json:"pools"`
-	Disks        []model.DiskInfo   `json:"disks,omitempty"`
-	System       *model.SystemInfo  `json:"system,omitempty"`
+	Label        string                 `json:"label"`
+	Location     string                 `json:"location,omitempty"`
+	FetchedAt    time.Time              `json:"fetched_at"`
+	Error        string                 `json:"error,omitempty"`
+	Exporters    model.ExporterStatuses `json:"exporters"`
+	ExporterInfo model.ExporterInfo     `json:"exporter_info,omitempty"`
+	SmartctlInfo model.SmartctlInfo     `json:"smartctl_info,omitempty"`
+	Pools        []model.Pool           `json:"pools"`
+	Disks        []model.DiskInfo       `json:"disks,omitempty"`
+	System       *model.SystemInfo      `json:"system,omitempty"`
 }
 
 // systemView is the /api/system response row for one endpoint with a
-// node_exporter configured.
+// node_exporter available or explicitly required.
 type systemView struct {
-	Label     string            `json:"label"`
-	Location  string            `json:"location,omitempty"`
-	FetchedAt time.Time         `json:"fetched_at"`
-	Error     string            `json:"error,omitempty"`
-	System    *model.SystemInfo `json:"system,omitempty"`
+	Label     string                 `json:"label"`
+	Location  string                 `json:"location,omitempty"`
+	FetchedAt time.Time              `json:"fetched_at"`
+	Error     string                 `json:"error,omitempty"`
+	System    *model.SystemInfo      `json:"system,omitempty"`
+	Exporters model.ExporterStatuses `json:"exporters"`
+	PoolCount int                    `json:"pool_count"`
+	DiskCount int                    `json:"disk_count"`
 }
 
 // systemPageData is the data passed to the system page template.
@@ -84,14 +76,14 @@ type systemPageData struct {
 	FetchedAt string
 
 	// Fleet KPI aggregates
-	TotalNodes   int
-	Unreachable  int
-	TotalCores   int
-	AvgCPUPct    float64
-	HasCPU       bool
-	MemUsedBytes float64
-	MemTotal     float64
-	MaxTempC     float64
+	TotalNodes     int
+	ExporterErrors int
+	TotalCores     int
+	AvgCPUPct      float64
+	HasCPU         bool
+	MemUsedBytes   float64
+	MemTotal       float64
+	MaxTempC       float64
 }
 
 // buildSystemPageData aggregates fleet KPIs over the system views.
@@ -104,8 +96,10 @@ func buildSystemPageData(views []systemView) systemPageData {
 	var cpuSum float64
 	var cpuN int
 	for _, v := range views {
+		if v.Exporters.HasErrors() {
+			d.ExporterErrors++
+		}
 		if v.System == nil {
-			d.Unreachable++
 			continue
 		}
 		s := v.System
@@ -129,35 +123,48 @@ func buildSystemPageData(views []systemView) systemPageData {
 	return d
 }
 
-// systemViews returns view rows for nodes that have system data (or where a
-// node_exporter is configured but returned nothing, so the UI can show an
-// error card).
-func systemViews(nodes []model.NodeData, cfg *config.Config) []systemView {
-	configured := make(map[string]bool, len(cfg.Endpoints))
-	for _, ep := range cfg.Endpoints {
-		if ep.NodeExporterURL != "" {
-			configured[ep.Label] = true
-		}
-	}
-	// make (not var) so an empty result marshals as [] rather than null.
+// systemViews includes available and required node exporters in /api/system.
+func systemViews(nodes []model.NodeData) []systemView {
 	out := make([]systemView, 0, len(nodes))
-	for _, n := range nodes {
-		if n.System == nil && !configured[n.Label] {
-			continue
+	for _, node := range nodes {
+		if node.Exporters.Node.Visible() {
+			out = append(out, hostView(node))
 		}
-		errMsg := ""
-		if n.System == nil {
-			errMsg = "node_exporter unreachable or returned no data"
-		}
-		out = append(out, systemView{
-			Label:     n.Label,
-			Location:  n.Location,
-			FetchedAt: n.FetchedAt,
-			Error:     errMsg,
-			System:    n.System,
-		})
 	}
 	return out
+}
+
+// hostViews keeps all configured hosts on the homepage, including hosts for
+// which automatic discovery has not found any exporters yet.
+func hostViews(nodes []model.NodeData) []systemView {
+	out := make([]systemView, 0, len(nodes))
+	for _, node := range nodes {
+		out = append(out, hostView(node))
+	}
+	return out
+}
+
+// hostView builds the system row for one host.
+func hostView(node model.NodeData) systemView {
+	sys := node.System
+	if sys != nil && node.Exporters.ZFS.Available {
+		// Pools already cover ZFS space. Copy so the shared cache stays read-only.
+		filtered := *sys
+		filtered.Filesystems = slices.DeleteFunc(slices.Clone(sys.Filesystems), func(fs model.FSInfo) bool {
+			return fs.FSType == "zfs"
+		})
+		sys = &filtered
+	}
+	return systemView{
+		Label:     node.Label,
+		Location:  node.Location,
+		FetchedAt: node.FetchedAt,
+		Error:     node.Exporters.Node.Error,
+		System:    sys,
+		Exporters: node.Exporters,
+		PoolCount: len(node.Pools),
+		DiskCount: len(node.Disks),
+	}
 }
 
 // nodeViews converts fetched node data into its URL-stripped view form.
@@ -168,7 +175,8 @@ func nodeViews(nodes []model.NodeData) []nodeView {
 			Label:        n.Label,
 			Location:     n.Location,
 			FetchedAt:    n.FetchedAt,
-			Error:        sanitizeError(n.Error, n.URL),
+			Error:        n.Error,
+			Exporters:    n.Exporters,
 			ExporterInfo: n.ExporterInfo,
 			SmartctlInfo: n.SmartctlInfo,
 			Pools:        n.Pools,
@@ -177,4 +185,21 @@ func nodeViews(nodes []model.NodeData) []nodeView {
 		}
 	}
 	return views
+}
+
+// hostTitle prefers the reported hostname over a bare IP label.
+// The label itself stays the stable history key.
+func hostTitle(label string, sys *model.SystemInfo) string {
+	if _, err := netip.ParseAddr(label); err == nil && sys != nil && sys.Hostname != "" {
+		return sys.Hostname
+	}
+	return label
+}
+
+// plural formats a count with a naively pluralized noun.
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
 }

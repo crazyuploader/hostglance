@@ -8,15 +8,15 @@ RUN go mod download
 COPY . .
 
 ARG TARGETOS TARGETARCH BUILDPLATFORM
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o zfs-dash .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o hostglance .
 
 FROM alpine:3.24
 
 RUN apk --no-cache add ca-certificates tzdata wget
 
-COPY --from=builder /app/zfs-dash /zfs-dash
+COPY --from=builder /app/hostglance /hostglance
 
 EXPOSE 8054
 
-ENTRYPOINT ["/zfs-dash"]
+ENTRYPOINT ["/hostglance"]
 CMD ["serve"]

@@ -35,10 +35,13 @@ go.work.sum
 config.yaml
 
 # Binaries
-zfs-dash
+hostglance
 
 # Data
 /data/
+
+# Playwright MCP screenshots and snapshots
+/.playwright-mcp/
 
 # Air (live reload) build output
 /tmp/

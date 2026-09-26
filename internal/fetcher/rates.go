@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/crazyuploader/zfs-dash/internal/model"
+	"github.com/crazyuploader/hostglance/internal/model"
 )
 
 // minRateInterval guards against nonsense rates from back-to-back scrapes.

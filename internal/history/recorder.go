@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crazyuploader/zfs-dash/internal/fetcher"
-	"github.com/crazyuploader/zfs-dash/internal/model"
+	"github.com/crazyuploader/hostglance/internal/fetcher"
+	"github.com/crazyuploader/hostglance/internal/model"
 )
 
 // Recorder polls the fetcher and writes metrics to the Store.

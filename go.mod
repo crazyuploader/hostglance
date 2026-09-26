@@ -1,18 +1,19 @@
-module github.com/crazyuploader/zfs-dash
+module github.com/crazyuploader/hostglance
 
 go 1.26.2
 
 require (
 	github.com/fsnotify/fsnotify v1.10.1
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	go.etcd.io/bbolt v1.5.0
 )
 
 require (
 	github.com/andybalholm/brotli v1.2.2 // indirect
-	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gofiber/schema v1.8.3 // indirect
 	github.com/gofiber/utils/v2 v2.4.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -26,7 +27,6 @@ require (
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

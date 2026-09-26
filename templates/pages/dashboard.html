@@ -1,4 +1,4 @@
-{{define "title"}}ZFS Dashboard{{end}}
+{{define "title"}}HostGlance — Storage{{end}}
 
 {{define "body-attrs"}} data-reload-on-refresh{{end}}
 
@@ -260,7 +260,7 @@
   background: var(--warn-section-bg);
 }
 
-/* Faulted/unreachable variant */
+/* Faulted/exporter error variant */
 .alert-section.faulted {
   border-color: var(--err-section-border);
   background: var(--err-section-bg);
@@ -362,31 +362,6 @@
 .faulted .alert-body .pool-card:hover {
   border-color: color-mix(in oklab, var(--error) 50%, transparent);
 }
-
-/* Node failures (unreachable) inside the faulted alert section */
-.alert-node-err {
-  background: color-mix(in oklab, var(--error-dim) 60%, transparent);
-  border: 1px solid color-mix(in oklab, var(--error) 22%, transparent);
-  border-radius: var(--radius-lg); padding: var(--space-4);
-  display: flex; flex-direction: column; gap: var(--space-3);
-}
-.alert-node-err-head {
-  display: flex; align-items: center; gap: var(--space-2);
-}
-.alert-node-err-head > svg { margin-top: 2px; }
-.alert-node-err-label { font-size: var(--text-sm); font-weight: 600; color: var(--error); line-height: 1; }
-.alert-node-err-loc {
-  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  padding: 2px 7px; border-radius: var(--radius-full);
-  background: rgba(221,105,116,0.15); color: var(--error);
-  border: 1px solid rgba(221,105,116,0.3);
-}
-.alert-node-err-msg {
-  display: flex; align-items: flex-start; gap: var(--space-2);
-  font-size: var(--text-xs); color: var(--error); font-family: var(--font-mono);
-  opacity: 0.85;
-}
-.alert-node-err-msg svg { flex-shrink: 0; margin-top: 1px; }
 
 /* Pool detail Modal ── */
 .pool-card[data-has-datasets="true"] { cursor: pointer; }
@@ -616,16 +591,18 @@
 
   <!-- Page header -->
   <div class="page-header animate-in">
-    <h1 class="page-title">Pool Overview</h1>
-    <p class="page-sub">{{.TotalNodes}} node{{if gt .TotalNodes 1}}s{{end}} &middot; {{.TotalPools}} pool{{if gt .TotalPools 1}}s{{end}} &middot; {{.UnreachableNodes}} unreachable &middot; fetched {{.FetchedAt}}</p>
+    <h1 class="page-title">Storage Overview</h1>
+    <p class="page-sub">{{plural .TotalNodes "host"}} &middot; {{plural .TotalPools "pool"}} &middot; fetched {{.FetchedAt}}</p>
   </div>
 
   <!-- KPI summary -->
+  {{if not .Nodes}}<div class="empty"><h3>No storage exporters detected</h3><p>Storage appears when ZFS or disk health metrics are available.</p></div>{{end}}
+
   <div class="kpi-row animate-in animate-in-delayed-1" role="region" aria-label="Fleet summary">
     <div class="kpi">
-      <div class="kpi-label">Nodes</div>
+      <div class="kpi-label">Hosts</div>
       <div class="kpi-val neutral">{{.TotalNodes}}</div>
-      <div class="kpi-hint">endpoints</div>
+      <div class="kpi-hint">with storage</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Pools</div>
@@ -633,9 +610,9 @@
       <div class="kpi-hint">total</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Unreachable</div>
-      <div class="kpi-val {{if gt .UnreachableNodes 0}}bad{{else}}neutral{{end}}">{{.UnreachableNodes}}</div>
-      <div class="kpi-hint">nodes down</div>
+      <div class="kpi-label">Errors</div>
+      <div class="kpi-val {{if gt .StorageErrors 0}}bad{{else}}neutral{{end}}">{{.StorageErrors}}</div>
+      <div class="kpi-hint">required storage exporters</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Healthy</div>
@@ -679,7 +656,7 @@
       <!-- pools grid reused inside the alert body -->
       <div class="pools-grid">
         {{range $ni, $node := .Nodes}}
-        {{if not $node.Error}}
+        {{if not $node.Exporters.ZFS.Error}}
         {{range $pi, $pool := $node.Pools}}
         {{if eq $pool.Health "DEGRADED"}}
         {{template "poolCard" dict "pool" $pool "ni" $ni "pi" $pi}}
@@ -715,7 +692,7 @@
     <div class="alert-body collapsed" id="body-faulted">
       <div class="pools-grid">
         {{range $ni, $node := .Nodes}}
-        {{if not $node.Error}}
+        {{if not $node.Exporters.ZFS.Error}}
         {{range $pi, $pool := $node.Pools}}
         {{if ne $pool.Health "ONLINE"}}{{if ne $pool.Health "DEGRADED"}}
         {{template "poolCard" dict "pool" $pool "ni" $ni "pi" $pi}}
@@ -730,7 +707,7 @@
 
   <!-- ══ Per-node pools ══ -->
   {{range $ni, $node := .Nodes}}
-  <section class="node {{if $node.Error}}node--error{{end}} animate-in {{if eq $ni 0}}animate-in-delayed-3{{else if eq $ni 1}}animate-in-delayed-4{{else if eq $ni 2}}animate-in-delayed-5{{else}}animate-in-delayed-6{{end}}" aria-label="Node {{$node.Label}}">
+  <section class="node {{if or $node.Exporters.ZFS.Error $node.Exporters.Smartctl.Error}}node--error{{end}} animate-in {{if eq $ni 0}}animate-in-delayed-3{{else if eq $ni 1}}animate-in-delayed-4{{else if eq $ni 2}}animate-in-delayed-5{{else}}animate-in-delayed-6{{end}}" aria-label="Host {{$node.Label}}">
 
     <div class="node-head">
       <div class="node-icon-wrap" aria-hidden="true">
@@ -738,7 +715,9 @@
       </div>
       <div class="node-meta">
         <div class="node-label-row">
-          <div class="node-label">{{$node.Label}}</div>
+          {{$title := hostTitle $node.Label $node.System}}
+          <div class="node-label">{{$title}}</div>
+          {{if ne $title $node.Label}}<div class="node-location">{{$node.Label}}</div>{{end}}
           {{if $node.Location}}<div class="node-location">{{$node.Location}}</div>{{end}}
         </div>
         <div class="node-url-row">
@@ -751,16 +730,16 @@
       </div>
     </div>
 
-    {{if $node.Error}}
+    {{if $node.Exporters.ZFS.Error}}
     <div class="node-zfs-err">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
-      <span>ZFS unavailable: {{$node.Error}}</span>
+      <span>Required ZFS exporter {{$node.Exporters.ZFS.Error}}</span>
     </div>
-    {{else if not $node.Pools}}
+    {{else if and $node.Exporters.ZFS.Visible (not $node.Pools)}}
     <div class="empty">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="1.4" aria-hidden="true">
@@ -768,14 +747,20 @@
         <path d="M8 7h8M8 12h8M8 17h4"/>
       </svg>
       <h3>No pools found</h3>
-      <p>The exporter returned no ZFS pool metrics for this node.</p>
+      <p>The exporter returned no ZFS pool metrics for this host.</p>
     </div>
-    {{else}}
+    {{else if $node.Pools}}
     <div class="pools-grid">
       {{range $pi, $pool := $node.Pools}}
       {{template "poolCard" dict "pool" $pool "ni" $ni "pi" $pi}}
       {{end}}
     </div>
+    {{end}}
+
+    {{if $node.Exporters.Smartctl.Error}}
+    <div class="node-zfs-err">Required SMART exporter {{$node.Exporters.Smartctl.Error}}</div>
+    {{else if and $node.Exporters.Smartctl.Visible (not $node.Disks)}}
+    <div class="empty"><h3>No disks reported</h3><p>The disk health exporter returned no disk metrics.</p></div>
     {{end}}
 
     {{if $node.Disks}}
@@ -942,11 +927,11 @@
 
 <!-- footer -->
 <footer class="site-footer">
-  <a class="footer-link" href="https://github.com/crazyuploader/zfs-dash" target="_blank" rel="noopener noreferrer">
+  <a class="footer-link" href="https://github.com/crazyuploader/hostglance" target="_blank" rel="noopener noreferrer">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.504.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.026 2.747-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.2 22 16.447 22 12.021 22 6.484 17.522 2 12 2z"/>
     </svg>
-    crazyuploader/zfs-dash
+    crazyuploader/hostglance
   </a>
 </footer>
 
@@ -1041,7 +1026,7 @@
     const id = trigger.id || '';
     trigger.setAttribute('aria-expanded', String(nowOpen));
     if (id.indexOf('toggle-') === 0 && id.indexOf('disk-toggle-') !== 0) {
-      // Alert sections: toggle-degraded / toggle-faulted / toggle-unreachable
+      // Alert sections: toggle-degraded / toggle-faulted
       const key = id.replace('toggle-', '');
       const body    = document.getElementById('body-' + key);
       const arrow   = document.getElementById('arrow-' + key);
@@ -1069,7 +1054,7 @@
     setOpen(trigger, trigger.getAttribute('aria-expanded') !== 'true');
   }
 
-  ['toggle-degraded', 'toggle-faulted', 'toggle-unreachable'].forEach(function (id) {
+  ['toggle-degraded', 'toggle-faulted'].forEach(function (id) {
     const toggle = document.getElementById(id);
     if (toggle) toggle.addEventListener('click', function () { flip(toggle); });
   });
@@ -1174,8 +1159,8 @@
   if (overlay)   overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
-  /* ── Animate usage bars ── */
-  if (!prefersReducedMotion) {
+  /* ── Animate usage bars (not on refresh reloads) ── */
+  if (!prefersReducedMotion && !document.documentElement.classList.contains('no-anim')) {
     document.querySelectorAll('.bar-fill[data-width]').forEach(function (el) {
       const target = el.getAttribute('data-width') + '%';
       requestAnimationFrame(function () {
@@ -1219,7 +1204,7 @@
   }
 
   /* ── Restore UI state (open toggles + scroll) after reload ── */
-  if (window.zfsdashRestore) window.zfsdashRestore(setOpen);
+  if (window.hostglanceRestore) window.hostglanceRestore(setOpen);
 })();
 </script>
 {{end}}

@@ -6,7 +6,7 @@
   /* ── Theme toggle (shared) ── */
   var html = document.documentElement;
   var themeBtn = document.querySelector('[data-theme-toggle]');
-  var themeKey = 'zfs-dash-theme';
+  var themeKey = 'hostglance-theme';
   var theme;
   try { theme = localStorage.getItem(themeKey); } catch (_) { theme = null; }
   if (theme !== 'dark' && theme !== 'light') {
@@ -23,7 +23,7 @@
       themeBtn.innerHTML = t === 'dark' ? moonSVG : sunSVG;
       themeBtn.setAttribute('aria-label', 'Switch to ' + (t === 'dark' ? 'light' : 'dark') + ' mode');
     }
-    document.dispatchEvent(new CustomEvent('zfsdash:theme', { detail: t }));
+    document.dispatchEvent(new CustomEvent('hostglance:theme', { detail: t }));
   }
   applyTheme(theme);
   if (themeBtn) {
@@ -64,8 +64,8 @@
   /* ── UI state persistence across reloads ──
      Saves scroll position + open collapsibles (by trigger id) to
      sessionStorage; pages with collapsibles register a setOpen handler via
-     zfsdashRestore so restore uses the same code path as clicks. */
-  var stateKey = 'zfsdash:ui:' + location.pathname;
+     hostglanceRestore so restore uses the same code path as clicks. */
+  var stateKey = 'hostglance:ui:' + location.pathname;
 
   function saveState() {
     try {
@@ -78,7 +78,7 @@
   }
   window.addEventListener('pagehide', saveState);
 
-  window.zfsdashRestore = function (setOpen) {
+  window.hostglanceRestore = function (setOpen) {
     var raw;
     try {
       raw = sessionStorage.getItem(stateKey);

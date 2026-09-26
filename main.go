@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/crazyuploader/zfs-dash/cmd"
+	"github.com/crazyuploader/hostglance/cmd"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-{{define "title"}}ZFS Dashboard — History{{end}}
+{{define "title"}}HostGlance — History{{end}}
 
 {{define "styles"}}
 <style>
@@ -279,7 +279,7 @@ canvas#chart { display:block; width:100%; }
   overlayEl.addEventListener('click', () => setSidebar(false));
 
   /* Re-render chart when the shared theme toggle fires */
-  document.addEventListener('zfsdash:theme', () => {
+  document.addEventListener('hostglance:theme', () => {
     if (activeSeries.length) renderChart();
   });
 

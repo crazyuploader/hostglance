@@ -1,4 +1,4 @@
-// Package history provides bbolt-backed time-series storage for ZFS metrics.
+// Package history provides bbolt-backed storage for system and storage metrics.
 package history
 
 import (

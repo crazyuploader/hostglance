@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crazyuploader/zfs-dash/internal/parser"
+	"github.com/crazyuploader/hostglance/internal/parser"
 )
 
 // nodeExporterFixture mirrors the label shapes of a real node_exporter 1.11
@@ -100,11 +100,11 @@ func TestExtractSystem(t *testing.T) {
 		t.Errorf("MemUsedPct = %v, want %v", sys.MemUsedPct, wantMemPct)
 	}
 
-	// Filesystems: only ext4 + vfat survive (zfs and tmpfs filtered).
-	if len(sys.Filesystems) != 2 {
-		t.Fatalf("Filesystems = %+v, want 2 entries", sys.Filesystems)
+	// ZFS mounts remain visible even without a separate ZFS exporter; tmpfs is filtered.
+	if len(sys.Filesystems) != 3 {
+		t.Fatalf("Filesystems = %+v, want 3 entries", sys.Filesystems)
 	}
-	if sys.Filesystems[0].Mountpoint != "/" || sys.Filesystems[1].Mountpoint != "/boot/efi" {
+	if sys.Filesystems[0].Mountpoint != "/" || sys.Filesystems[1].Mountpoint != "/boot/efi" || sys.Filesystems[2].Mountpoint != "/nova" {
 		t.Errorf("filesystem order/mounts wrong: %+v", sys.Filesystems)
 	}
 	if sys.Filesystems[0].UsedPct < 82 || sys.Filesystems[0].UsedPct > 83 {
@@ -149,5 +149,18 @@ func TestExtractSystemEmpty(t *testing.T) {
 	samples, _ := parser.Parse(strings.NewReader("some_other_metric 1\n"))
 	if got := ExtractSystem(samples); got != nil {
 		t.Errorf("ExtractSystem(unrelated) = %+v, want nil", got)
+	}
+}
+
+func TestExtractSystemWithPartialCollectors(t *testing.T) {
+	samples, err := parser.Parse(strings.NewReader(`node_filesystem_size_bytes{device="tank",fstype="zfs",mountpoint="/tank"} 1000
+node_filesystem_avail_bytes{device="tank",fstype="zfs",mountpoint="/tank"} 400
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sys := ExtractSystem(samples)
+	if sys == nil || len(sys.Filesystems) != 1 || sys.Filesystems[0].UsedPct != 60 {
+		t.Fatalf("partial node_exporter metrics were discarded: %+v", sys)
 	}
 }
