@@ -19,16 +19,17 @@ type ExporterStatuses struct {
 	Node     ExporterStatus `json:"node"`
 	ZFS      ExporterStatus `json:"zfs"`
 	Smartctl ExporterStatus `json:"smartctl"`
+	PVE      ExporterStatus `json:"pve"`
 }
 
 // AnyAvailable reports whether discovery found at least one exporter.
 func (s ExporterStatuses) AnyAvailable() bool {
-	return s.Node.Available || s.ZFS.Available || s.Smartctl.Available
+	return s.Node.Available || s.ZFS.Available || s.Smartctl.Available || s.PVE.Available
 }
 
 // HasErrors excludes absent automatic exporters from error counts.
 func (s ExporterStatuses) HasErrors() bool {
-	return s.Node.Error != "" || s.ZFS.Error != "" || s.Smartctl.Error != ""
+	return s.Node.Error != "" || s.ZFS.Error != "" || s.Smartctl.Error != "" || s.PVE.Error != ""
 }
 
 // StorageVisible reports whether storage data or an explicit requirement exists.

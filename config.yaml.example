@@ -30,6 +30,11 @@ hosts:
         mode: disabled # never connect to this exporter
   - address: nas-vm.home
     parent: node-1 # this VM runs on node-1. Fleet totals do not count it.
+  - address: pve01.home
+    label: pve01
+    exporters:
+      pve: # prometheus-pve-exporter. No default URL, so set url to use it.
+        url: "http://127.0.0.1:9221/pve?target=pve01.home&module=pve01&cluster=1&node=0"
   - address: "2001:db8::20" # you can write IPv6 addresses without brackets
     label: node-2
     exporters:

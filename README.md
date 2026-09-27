@@ -96,13 +96,14 @@ If a host is a VM or a container that runs on another host, set `parent` to the 
 
 ### Exporter discovery
 
-Each exporter that you do not configure uses `mode: auto`. HostGlance connects to the default URL of each exporter and looks for the metric names that the exporter writes:
+Each exporter that you do not configure uses `mode: auto`. The `pve` exporter is the exception, because it needs a `url`. HostGlance connects to the default URL of each exporter and looks for the metric names that the exporter writes:
 
 | Exporter   | Default URL                  | Data                                                  |
 | ---------- | ---------------------------- | ----------------------------------------------------- |
 | `node`     | `http://<host>:9100/metrics` | CPU, memory, load, network, filesystems, temperatures |
 | `zfs`      | `http://<host>:9134/metrics` | ZFS pools and datasets                                |
 | `smartctl` | `http://<host>:9633/metrics` | Disk health, temperature, wear                        |
+| `pve`      | none, set `url`              | Proxmox VMs and LXC containers                        |
 
 HostGlance does not scan your network and does not install exporters. Each exporter must run already, and HostGlance must be able to connect to it. To use a different port, scheme, or path, or a reverse proxy, set the `url` field.
 
@@ -113,6 +114,25 @@ HostGlance does not scan your network and does not install exporters. Each expor
 | `disabled` | Never connects to the exporter.                                                                                                   |
 
 HostGlance looks for exporters at startup and again at each refresh. If you start an exporter later, its metrics appear at the next refresh. An `auto` exporter that stops responding does not mark the host as unhealthy. When one exporter fails, the other exporters on the host continue to work. An unhealthy pool fails the health check in every mode, `auto` included.
+
+### Proxmox guests
+
+The `pve` exporter is [prometheus-pve-exporter](https://github.com/prometheus-pve/prometheus-pve-exporter). It reads the Proxmox API, so it can run on another server. For this reason, it has no default URL, and HostGlance does not connect to it until you set `url`.
+
+Set the URL on the entry of the Proxmox host. The `target` parameter is the address of the Proxmox node, and `module` is the section in the `pve.yml` file of the exporter:
+
+```yaml
+- address: 100.64.0.27
+  label: PVE01
+  exporters:
+    pve:
+      mode: enabled
+      url: "http://127.0.0.1:9221/pve?target=100.64.0.27&module=pve01&cluster=1&node=0"
+```
+
+The query needs `cluster=1`, because the guest metrics come from the cluster collectors. `node=0` turns off the node collectors, which HostGlance does not use.
+
+The card of the Proxmox host then lists each VM and container with its state, CPU, memory, and uptime. HostGlance skips templates. A stopped guest does not fail the health check. For a VM, the memory value comes from Proxmox, and it includes the page cache of the guest.
 
 ### Move from the old endpoints format
 

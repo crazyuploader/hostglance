@@ -37,6 +37,9 @@ type Exporters struct {
 	Node     Exporter `mapstructure:"node"`
 	ZFS      Exporter `mapstructure:"zfs"`
 	Smartctl Exporter `mapstructure:"smartctl"`
+	// PVE is prometheus-pve-exporter. It usually runs on another server, so it
+	// has no default URL and stays off until url is set.
+	PVE Exporter `mapstructure:"pve"`
 }
 
 // Host is a stable display/history identity with optional metrics sources.
@@ -160,6 +163,7 @@ func normalizeHost(host *Host) error {
 		{name: "node", port: "9100", exp: &host.Exporters.Node},
 		{name: "zfs", port: "9134", exp: &host.Exporters.ZFS},
 		{name: "smartctl", port: "9633", exp: &host.Exporters.Smartctl},
+		{name: "pve", exp: &host.Exporters.PVE},
 	}
 	for _, source := range sources {
 		exp := source.exp
@@ -168,6 +172,12 @@ func normalizeHost(host *Host) error {
 		case ModeAuto, ModeEnabled, ModeDisabled:
 		default:
 			return fmt.Errorf("%s mode must be auto, enabled, or disabled", source.name)
+		}
+		if exp.URL == "" && source.port == "" {
+			if exp.Mode == ModeEnabled {
+				return fmt.Errorf("%s exporter has no default URL: set its url", source.name)
+			}
+			exp.Mode = ModeDisabled
 		}
 		if exp.URL == "" && exp.Mode != ModeDisabled {
 			u := url.URL{Scheme: "http", Host: net.JoinHostPort(host.Address, source.port), Path: "/metrics"}
@@ -226,6 +236,7 @@ func legacyHost(ep legacyEndpoint) (Host, error) {
 			ZFS:      Exporter{Mode: ModeEnabled, URL: ep.URL},
 			Node:     optional(ep.NodeExporterURL),
 			Smartctl: optional(ep.SmartctlURL),
+			PVE:      Exporter{Mode: ModeDisabled},
 		},
 	}, nil
 }

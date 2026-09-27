@@ -82,6 +82,7 @@ func TestLoadHostsValidation(t *testing.T) {
 		{name: "legacy missing URL", yaml: "endpoints: [{label: nas}]", want: "missing url"},
 		{name: "numeric host", yaml: "hosts: [42]", want: "decode"},
 		{name: "null host", yaml: "hosts: [null]", want: "missing address"},
+		{name: "pve enabled without url", yaml: "hosts: [{address: pve, exporters: {pve: {mode: enabled}}}]", want: "no default URL"},
 		{name: "unknown parent", yaml: "hosts: [{address: vm, parent: pve}]", want: "not a configured host label"},
 		{name: "self parent", yaml: "hosts: [{address: vm, parent: vm}]", want: "own parent"},
 		{name: "nested guest", yaml: "hosts: [pve, {address: vm, parent: pve}, {address: ct, parent: vm}]", want: "only one nesting level"},
@@ -185,5 +186,25 @@ func TestLoadHostParent(t *testing.T) {
 	}
 	if cfg.Hosts[0].Parent != "" || cfg.Hosts[1].Parent != "pve" {
 		t.Fatalf("parents = %q, %q", cfg.Hosts[0].Parent, cfg.Hosts[1].Parent)
+	}
+}
+
+func TestPVEExporterNeedsURL(t *testing.T) {
+	t.Parallel()
+	cfg, err := configFromYAML(t, `hosts:
+  - plain
+  - address: pve
+    exporters:
+      pve:
+        url: "http://127.0.0.1:9221/pve?target=10.0.0.1&module=pve01&cluster=1&node=0"
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Hosts[0].Exporters.PVE; got.Mode != ModeDisabled || got.URL != "" {
+		t.Errorf("pve without url must stay off, got %+v", got)
+	}
+	if got := cfg.Hosts[1].Exporters.PVE; got.Mode != ModeAuto || got.URL == "" {
+		t.Errorf("pve with url must be auto, got %+v", got)
 	}
 }

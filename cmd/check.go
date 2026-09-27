@@ -41,11 +41,11 @@ func init() {
 // writeCheck prints one row per host and returns how many hosts failed.
 func writeCheck(out io.Writer, nodes []model.NodeData) int {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "HOST\tNODE\tZFS\tSMARTCTL")
+	_, _ = fmt.Fprintln(w, "HOST\tNODE\tZFS\tSMARTCTL\tPVE")
 	failed := 0
 	for _, n := range nodes {
 		e := n.Exporters
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", n.Label, checkState(e.Node), checkState(e.ZFS), checkState(e.Smartctl))
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", n.Label, checkState(e.Node), checkState(e.ZFS), checkState(e.Smartctl), checkState(e.PVE))
 		if e.HasErrors() {
 			failed++
 		}

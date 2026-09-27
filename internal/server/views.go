@@ -66,6 +66,7 @@ type systemView struct {
 	Error     string                 `json:"error,omitempty"`
 	System    *model.SystemInfo      `json:"system,omitempty"`
 	Exporters model.ExporterStatuses `json:"exporters"`
+	Guests    []model.Guest          `json:"guests,omitempty"`
 	PoolCount int                    `json:"pool_count"`
 	DiskCount int                    `json:"disk_count"`
 }
@@ -174,6 +175,7 @@ func hostView(node model.NodeData) systemView {
 		Label:     node.Label,
 		Location:  node.Location,
 		Parent:    node.Parent,
+		Guests:    node.Guests,
 		FetchedAt: node.FetchedAt,
 		Error:     node.Exporters.Node.Error,
 		System:    sys,

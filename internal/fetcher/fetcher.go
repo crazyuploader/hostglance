@@ -73,6 +73,7 @@ func pendingHosts(hosts []config.Host) []model.NodeData {
 				Node:     model.ExporterStatus{Mode: string(host.Exporters.Node.Mode)},
 				ZFS:      model.ExporterStatus{Mode: string(host.Exporters.ZFS.Mode)},
 				Smartctl: model.ExporterStatus{Mode: string(host.Exporters.Smartctl.Mode)},
+				PVE:      model.ExporterStatus{Mode: string(host.Exporters.PVE.Mode)},
 			},
 		}
 	}
@@ -238,7 +239,7 @@ func (f *Fetcher) fetchExporter(
 ) exporterResult {
 	mode := exp.Mode
 	result := exporterResult{status: model.ExporterStatus{Mode: string(mode)}}
-	if mode == config.ModeDisabled {
+	if mode == config.ModeDisabled || exp.URL == "" { // nothing to scrape
 		return result
 	}
 	samples, err := f.fetchRaw(ctx, exp.URL)
@@ -285,13 +286,14 @@ func recognizesExporter(samples []parser.Sample, kind string) bool {
 
 // fetchOne scrapes all exporters on one host concurrently.
 func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData {
-	var node, zfs, smartctl exporterResult
+	var node, zfs, smartctl, pve exporterResult
 	var wg sync.WaitGroup
 	wg.Go(func() { node = f.fetchExporter(ctx, host.Label, host.Exporters.Node, "node") })
 	wg.Go(func() { zfs = f.fetchExporter(ctx, host.Label, host.Exporters.ZFS, "zfs") })
 	wg.Go(func() {
 		smartctl = f.fetchExporter(ctx, host.Label, host.Exporters.Smartctl, "smartctl")
 	})
+	wg.Go(func() { pve = f.fetchExporter(ctx, host.Label, host.Exporters.PVE, "pve") })
 	wg.Wait()
 
 	// Old endpoints may proxy both ZFS and SMART in one response. New hosts
@@ -310,7 +312,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData
 		Parent:    host.Parent,
 		FetchedAt: time.Now(),
 		Exporters: model.ExporterStatuses{
-			Node: node.status, ZFS: zfs.status, Smartctl: smartctl.status,
+			Node: node.status, ZFS: zfs.status, Smartctl: smartctl.status, PVE: pve.status,
 		},
 		Pools: model.ExtractPools(zfs.samples),
 	}
@@ -322,6 +324,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData
 	}
 	nd.Disks = model.ExtractDisks(smartctl.samples)
 	nd.SmartctlInfo = model.ExtractSmartctlInfo(smartctl.samples)
+	nd.Guests = model.ExtractGuests(pve.samples)
 
 	var problems []string
 	for _, source := range []struct {
@@ -331,6 +334,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData
 		{name: "node", status: node.status},
 		{name: "zfs", status: zfs.status},
 		{name: "smartctl", status: smartctl.status},
+		{name: "pve", status: pve.status},
 	} {
 		if source.status.Error != "" {
 			problems = append(problems, source.name+": "+source.status.Error)

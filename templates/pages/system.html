@@ -38,6 +38,26 @@
   border-left: 3px solid color-mix(in oklab, var(--primary) 40%, var(--border));
 }
 @media (min-width: 768px) { .sys-card.sys-card-guest { margin-left: var(--space-8); } }
+/* Proxmox guests from prometheus-pve-exporter */
+.sys-guests { margin-top: var(--space-3); }
+.guest-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; align-self: center; background: var(--text-faint); }
+.guest-dot.on { background: var(--success); }
+.guest-kind { color: var(--text-faint); font-size: 0.6rem; letter-spacing: 0.04em; }
+.sys-row.guest-row {
+  display: grid; align-items: baseline; column-gap: var(--space-3);
+  grid-template-columns: 7px minmax(0, 1fr) auto auto;
+  font-variant-numeric: tabular-nums;
+}
+.guest-row .sys-row-val { text-align: right; }
+.guest-up { display: none; }
+.guest-stopped { grid-column: 3 / -1; }
+@media (min-width: 640px) {
+  .sys-row.guest-row { grid-template-columns: 7px minmax(0, 1fr) 13ch 24ch 11ch; }
+  .guest-up { display: block; }
+}
+.guest-row.off .sys-row-name { color: var(--text-muted); }
+.sys-row-val.warn b { color: var(--warning); }
+.sys-row-val.bad b { color: var(--error); }
 .net-virtual { margin-top: var(--space-3); }
 .net-virtual summary {
   cursor: pointer; color: var(--text-muted); font-size: var(--text-sm);
@@ -230,6 +250,7 @@
 
     {{if $node.Exporters.ZFS.Error}}<div class="sys-err">Required ZFS exporter {{$node.Exporters.ZFS.Error}}</div>{{end}}
     {{if $node.Exporters.Smartctl.Error}}<div class="sys-err">Required SMART exporter {{$node.Exporters.Smartctl.Error}}</div>{{end}}
+    {{if $node.Exporters.PVE.Error}}<div class="sys-err">Required PVE exporter {{$node.Exporters.PVE.Error}}</div>{{end}}
     {{if or $node.PoolCount $node.DiskCount}}
     <div class="sys-storage"><a href="/storage">Storage</a> &middot; {{plural $node.PoolCount "pool"}} &middot; {{plural $node.DiskCount "disk"}}</div>
     {{end}}
@@ -363,6 +384,27 @@
 
     </div>
     {{end}}{{end}}
+
+    {{with $node.Guests}}
+    <div class="sys-block sys-guests">
+      <div class="sys-block-label">Proxmox guests &middot; {{len .}}</div>
+      <div class="sys-rows">
+        {{range .}}
+        <div class="sys-row guest-row {{if not .Running}}off{{end}}">
+          <span class="guest-dot {{if .Running}}on{{end}}" aria-hidden="true"></span>
+          <span class="sys-row-name" title="{{.ID}}">{{.Name}} <span class="guest-kind">{{.Kind}}</span></span>
+          {{if .Running}}
+          <span class="sys-row-val {{pctClass .CPUPct}}">cpu <b>{{printf "%.0f" .CPUPct}}%</b> of {{printf "%.0f" .Cores}}</span>
+          <span class="sys-row-val {{pctClass .MemPct}}">mem <b>{{humanBytes .MemUsed}}</b> / {{humanBytes .MemTotal}}</span>
+          <span class="sys-row-val sys-dim guest-up">up {{fmtUptime .UptimeSecs}}</span>
+          {{else}}
+          <span class="sys-row-val sys-dim guest-stopped">stopped</span>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
 
   </section>
   {{end}}

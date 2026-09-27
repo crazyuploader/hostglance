@@ -135,6 +135,7 @@ type NodeData struct {
 	SmartctlInfo SmartctlInfo     `json:"smartctl_info,omitempty"`
 	Pools        []Pool           `json:"pools"`
 	Disks        []DiskInfo       `json:"disks,omitempty"`
+	Guests       []Guest          `json:"guests,omitempty"`
 	System       *SystemInfo      `json:"system,omitempty"`
 }
 
