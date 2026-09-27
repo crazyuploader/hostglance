@@ -139,6 +139,54 @@ func TestNodeHealthResponse(t *testing.T) {
 			wantReason: "unhealthy_pools",
 		},
 		{
+			name: "proxmox storage exceeds usage threshold",
+			node: model.NodeData{
+				Label: "host",
+				Exporters: model.ExporterStatuses{
+					PVE: model.ExporterStatus{Mode: "enabled", Available: true},
+				},
+				PVE: &model.PVEInfo{Storages: []model.PVEStorage{
+					{Name: "local-lvm", Type: "lvmthin", Active: true, Used: 95, Total: 100},
+				}},
+			},
+			maxUsage:   90,
+			wantStatus: http.StatusServiceUnavailable,
+			wantState:  "degraded",
+			wantReason: "storage_over_threshold",
+		},
+		{
+			name: "inactive proxmox storage",
+			node: model.NodeData{
+				Label: "host",
+				Exporters: model.ExporterStatuses{
+					PVE: model.ExporterStatus{Mode: "enabled", Available: true},
+				},
+				PVE: &model.PVEInfo{Storages: []model.PVEStorage{
+					{Name: "nova-pbs", Type: "pbs", Active: false, Used: 1, Total: 100},
+				}},
+			},
+			wantStatus: http.StatusServiceUnavailable,
+			wantState:  "degraded",
+			wantReason: "storage_inactive",
+		},
+		{
+			name: "full zfspool is left to the zfs exporter",
+			node: model.NodeData{
+				Label: "host",
+				Exporters: model.ExporterStatuses{
+					ZFS: model.ExporterStatus{Mode: "auto", Available: true},
+					PVE: model.ExporterStatus{Mode: "enabled", Available: true},
+				},
+				Pools: []model.Pool{{Name: "nova", Health: model.HealthOnline, UsedPercent: 50}},
+				PVE: &model.PVEInfo{Storages: []model.PVEStorage{
+					{Name: "nova", Type: "zfspool", Active: true, Used: 95, Total: 100},
+				}},
+			},
+			maxUsage:   90,
+			wantStatus: http.StatusOK,
+			wantState:  "up",
+		},
+		{
 			name: "pool exceeds usage threshold",
 			node: model.NodeData{
 				Label: "host",
@@ -433,5 +481,96 @@ func TestGuestsFollowParentAndSkipTotals(t *testing.T) {
 	d := buildSystemPageData(views)
 	if d.TotalNodes != 4 || d.GuestNodes != 2 || d.TotalCores != 12 || d.MemTotal != 40 {
 		t.Errorf("totals: nodes=%d guests=%d cores=%d mem=%v", d.TotalNodes, d.GuestNodes, d.TotalCores, d.MemTotal)
+	}
+}
+
+func TestProxmoxGuestsLinkToHostCards(t *testing.T) {
+	t.Parallel()
+	pve := func(label string, guests ...model.Guest) model.NodeData {
+		return model.NodeData{Label: label, Guests: guests, System: &model.SystemInfo{Hostname: label}}
+	}
+	nodes := []model.NodeData{
+		pve("PVE01",
+			model.Guest{ID: "qemu/501", Name: "pve-i5-01", Running: true},
+			model.Guest{ID: "qemu/502", Name: "server08", Running: false},
+			model.Guest{ID: "lxc/302", Name: "vaultwarden"},
+			model.Guest{ID: "qemu/1", Name: "PVE01"}, // same name as its host: never a self-parent
+		),
+		{Label: "PVE-i5-01"}, // label match, case-insensitive
+		{Label: "100.64.0.18", System: &model.SystemInfo{Hostname: "Server08"}}, // hostname match
+		{Label: "manual", Parent: "PVE01"},
+	}
+	views := linkedViews(nodes)
+	byLabel := map[string]systemView{}
+	for _, v := range views {
+		byLabel[v.Label] = v
+	}
+	if v := byLabel["PVE01"]; v.Parent != "" || v.Proxmox != nil {
+		t.Errorf("PVE01 linked to itself: %+v", v)
+	}
+	if v := byLabel["PVE-i5-01"]; v.Parent != "PVE01" || v.Proxmox == nil || v.Proxmox.VMID() != "501" {
+		t.Errorf("label match: %+v", v)
+	}
+	if v := byLabel["100.64.0.18"]; v.Parent != "PVE01" || v.Proxmox == nil || v.Proxmox.Running {
+		t.Errorf("hostname match: %+v", v)
+	}
+	cards := map[string]string{}
+	for _, g := range byLabel["PVE01"].Guests {
+		cards[g.ID] = g.Card
+	}
+	if cards["qemu/501"] != "PVE-i5-01" || cards["qemu/502"] != "100.64.0.18" || cards["lxc/302"] != "" || cards["qemu/1"] != "" {
+		t.Errorf("guest card links = %v", cards)
+	}
+	d := buildSystemPageData(hostViews(nodes))
+	if d.GuestNodes != 3 {
+		t.Errorf("guests excluded from totals = %d, want 3", d.GuestNodes)
+	}
+}
+
+func TestSystemPageShowsProxmoxStoppedGuest(t *testing.T) {
+	t.Parallel()
+	pages, err := templates.Pages(funcMap())
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	now := time.Now()
+	nodes := []model.NodeData{
+		{Label: "pve", FetchedAt: now, Guests: []model.Guest{{ID: "qemu/502", Name: "vm", Type: "qemu"}}},
+		{Label: "vm", FetchedAt: now},
+	}
+	data := buildSystemPageData(hostViews(nodes))
+	data.pageData = newPageData("system", &config.Config{Refresh: time.Minute}, false, nodes)
+	var out bytes.Buffer
+	if err := pages["system"].ExecuteTemplate(&out, "base", data); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	html := out.String()
+	for _, want := range []string{"Proxmox reports this VM as stopped.", "VM 502 on pve", `href="#host-vm"`, `id="host-vm"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("page is missing %q", want)
+		}
+	}
+	_, card, _ := strings.Cut(html, `id="host-vm"`)
+	card, _, _ = strings.Cut(card, "</section>")
+	if strings.Contains(card, "No exporters detected.") {
+		t.Error("stopped guest card also shows the generic discovery message")
+	}
+}
+
+func TestPVEStoragesSkipPoolsTheZFSExporterShows(t *testing.T) {
+	t.Parallel()
+	n := model.NodeData{PVE: &model.PVEInfo{Storages: []model.PVEStorage{
+		{Name: "nova", Type: "zfspool"}, {Name: "local-lvm", Type: "lvmthin"}, {Name: "nova-pbs", Type: "pbs"},
+	}}}
+	if got := len(pveStorages(n)); got != 3 {
+		t.Errorf("without a ZFS exporter, all storages show: got %d", got)
+	}
+	n.Exporters.ZFS.Available = true
+	got := pveStorages(n)
+	if len(got) != 2 || got[0].Name != "local-lvm" || len(n.PVE.Storages) != 3 {
+		t.Errorf("zfspool not skipped, or cache mutated: %+v", got)
+	}
+	if !showOnStorage(model.NodeData{PVE: &model.PVEInfo{Storages: got}}) {
+		t.Error("a host with only Proxmox storages must show on the Storage page")
 	}
 }

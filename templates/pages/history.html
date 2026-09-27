@@ -245,7 +245,7 @@ canvas#chart { display:block; width:100%; }
               <path d="M7 15l3-4 3 3 4-6"/>
             </svg>
             <h3>Nothing plotted yet</h3>
-            <p>Select a metric on the left to show its history.</p>
+            <p>Select a metric in the series list to show its history.</p>
           </div>
         </div>
         <canvas id="chart" style="display:none"></canvas>
@@ -534,7 +534,7 @@ canvas#chart { display:block; width:100%; }
       empty.querySelector('h3').textContent = selected.size ? 'No data in this range' : 'Nothing plotted yet';
       empty.querySelector('p').textContent = selected.size
         ? 'Select a longer time range, or wait for more samples.'
-        : 'Select a metric on the left to show its history.';
+        : 'Select a metric in the series list to show its history.';
       legendEl.innerHTML = '';
       gaugeStrip.innerHTML = '';
       titleEl.textContent = 'No metrics selected';
@@ -641,7 +641,7 @@ canvas#chart { display:block; width:100%; }
     for (const s of activeSeries) {
       if (!s.info || !s.points || !s.points.length) continue;
       const color = colorMap[s.key] || COLORS[0];
-      const shortName = s.info.name.replace(/^.*\/([^/]+)$/, '$1');
+      const shortName = seriesLabel(s.info);
 
       const li = document.createElement('div');
       li.className = 'legend-item';
@@ -650,7 +650,7 @@ canvas#chart { display:block; width:100%; }
       legendEl.appendChild(li);
 
       const last = s.points[s.points.length - 1];
-      const truncName = shortName.length > 14 ? shortName.slice(0, 12) + '…' : shortName;
+      const truncName = shortName.length > 20 ? shortName.slice(0, 18) + '…' : shortName;
       const kpi = document.createElement('div');
       kpi.className = 'kpi';
       kpi.innerHTML = '<div class="kpi-label">' + esc(truncName) + '</div>' +
@@ -684,9 +684,8 @@ canvas#chart { display:block; width:100%; }
         if (d < minDist) { minDist = d; nearest = p; }
       }
       const color = colorMap[s.key] || COLORS[0];
-      // Short name: last segment, trimmed to ~12 chars
-      const rawName = s.info ? s.info.name.replace(/^.*\/([^/]+)$/, '$1') : s.key;
-      const shortName = rawName.length > 14 ? rawName.slice(0, 12) + '…' : rawName;
+      const rawName = s.info ? seriesLabel(s.info) : s.key;
+      const shortName = rawName.length > 20 ? rawName.slice(0, 18) + '…' : rawName;
       const row = document.createElement('div');
       row.className = 'tooltip-row';
       row.innerHTML =
@@ -727,6 +726,12 @@ canvas#chart { display:block; width:100%; }
   const RATE_METRICS = { rx_bps: 1, tx_bps: 1 };
 
   /* ── Helpers ── */
+  // seriesLabel names the host, so series from different hosts stay distinct.
+  // System metrics are per host, so their name ("node") adds nothing.
+  function seriesLabel(info) {
+    const name = info.name.replace(/^.*\/([^/]+)$/, '$1');
+    return info.kind === 'system' ? info.node : info.node + ' ' + name;
+  }
   function fmtVal(v, metric) {
     if (MIB_METRICS[metric]) return fmtBytes(v * (1 << 20));
     if (RATE_METRICS[metric]) return fmtBytes(v) + '/s';

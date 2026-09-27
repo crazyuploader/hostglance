@@ -92,7 +92,7 @@ Each host is a hostname, an IP address, or an object. The `address` field is a h
 
 The `label` field is the name that HostGlance shows. It is the address by default, and each label must be unique. Health URLs and history data use the label, so do not change it after you start to record history.
 
-If a host is a VM or a container that runs on another host, set `parent` to the label of that other host, for example `parent: pve01`. HostGlance shows the guest below its parent on the System page. The fleet totals for cores, memory, and CPU do not include guests, because the parent already counts their resources. A guest cannot have its own guests.
+If a host is a VM or a container that runs on another host, set `parent` to the label of that other host, for example `parent: pve01`. If the other host has a `pve` exporter, HostGlance can find the parent itself (see "Proxmox guests"). HostGlance shows the guest below its parent on the System page. The fleet totals for cores, memory, and CPU do not include guests, because the parent already counts their resources. A guest cannot have its own guests.
 
 ### Exporter discovery
 
@@ -133,6 +133,24 @@ Set the URL on the entry of the Proxmox host. The `target` parameter is the addr
 The query needs `cluster=1`, because the guest metrics come from the cluster collectors. `node=0` turns off the node collectors, which HostGlance does not use.
 
 The card of the Proxmox host then lists each VM and container with its state, CPU, memory, and uptime. HostGlance skips templates. A stopped guest does not fail the health check. For a VM, the memory value comes from Proxmox, and it includes the page cache of the guest.
+
+The guest list also shows:
+
+- A "no backup" flag on each guest that no Proxmox backup job includes, and the number of these guests in the list header.
+- "stopped, starts at boot" for a stopped guest that is set to start at boot. This usually means that the guest failed.
+- The lock, such as "backup lock", while Proxmox backs up, migrates, or snapshots the guest.
+- The disk use of each LXC container. A VM reports its disk use only when it runs the QEMU guest agent.
+
+The host card shows the Proxmox version. The Storage page shows the Proxmox storages of the host, such as LVM thin pools, Proxmox Backup Server datastores, NFS shares, and directories. It skips `zfspool` storages when the ZFS exporter responds, because the ZFS pools already show these.
+
+HostGlance also joins the guest list with the other hosts in the configuration. If the label or the reported hostname of a host is the same as a guest name, HostGlance:
+
+- Sets that Proxmox host as the parent. You do not have to write `parent`. A `parent` that you write takes priority.
+- Shows the guest number on the card of the guest, for example "VM 502 on PVE01".
+- Links the guest row in the list of the parent to the card of the guest.
+- Shows "Proxmox reports this VM as stopped." on the card when Proxmox reports the guest as stopped.
+
+The names must match. Case does not matter.
 
 ### Move from the old endpoints format
 
@@ -265,8 +283,12 @@ Monitoring tools such as Uptime Kuma can use the health checks. `GET /api/health
 | An `enabled` exporter does not respond                         | `503`       | A required exporter failed                         |
 | A pool is unhealthy, or its usage is above `max_usage_percent` | `503`       | Storage is unhealthy, in every exporter mode       |
 | ZFS is `enabled` but reports no pools                          | `503`       | Required ZFS storage is missing (`no_pools`)       |
+| A Proxmox storage is inactive                                  | `503`       | `reason: storage_inactive`                         |
+| A Proxmox storage is above `max_usage_percent`                 | `503`       | `reason: storage_over_threshold`                   |
 | No exporter responds, and none is required                     | `200`       | `status: unknown`, `reason: no_exporters_detected` |
 | All the checks above pass                                      | `200`       | `status: up`                                       |
+
+The Proxmox storage checks use the storages that the Storage page shows, so a `zfspool` storage is not checked twice when the ZFS exporter responds. The response names the storages in `inactive_storages` or `over_threshold_storages`.
 
 An `unknown` status is neutral. The exporters alone cannot show whether the machine is healthy.
 

@@ -1,9 +1,11 @@
 package server
 
 import (
+	"cmp"
 	"net/netip"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/crazyuploader/hostglance/internal/config"
@@ -31,12 +33,7 @@ func newPageData(
 		HistoryEnabled: historyEnabled,
 		RefreshSecs:    int(cfg.Refresh.Seconds()),
 	}
-	for _, node := range nodes {
-		if node.Exporters.StorageVisible() {
-			data.StorageEnabled = true
-			break
-		}
-	}
+	data.StorageEnabled = slices.ContainsFunc(nodes, showOnStorage)
 	return data
 }
 
@@ -54,6 +51,8 @@ type nodeView struct {
 	Pools        []model.Pool           `json:"pools"`
 	Disks        []model.DiskInfo       `json:"disks,omitempty"`
 	System       *model.SystemInfo      `json:"system,omitempty"`
+	// PVEStorages are Proxmox storages that the ZFS exporter does not cover.
+	PVEStorages []model.PVEStorage `json:"pve_storages,omitempty"`
 }
 
 // systemView is the /api/system response row for one endpoint with a
@@ -66,9 +65,12 @@ type systemView struct {
 	Error     string                 `json:"error,omitempty"`
 	System    *model.SystemInfo      `json:"system,omitempty"`
 	Exporters model.ExporterStatuses `json:"exporters"`
-	Guests    []model.Guest          `json:"guests,omitempty"`
-	PoolCount int                    `json:"pool_count"`
-	DiskCount int                    `json:"disk_count"`
+	Guests    []guestView            `json:"guests,omitempty"`
+	PVE       *model.PVEInfo         `json:"pve,omitempty"`
+	// Proxmox is this host's own guest record when a Proxmox host reports it.
+	Proxmox   *model.Guest `json:"proxmox,omitempty"`
+	PoolCount int          `json:"pool_count"`
+	DiskCount int          `json:"disk_count"`
 }
 
 // systemPageData is the data passed to the system page template.
@@ -130,34 +132,86 @@ func buildSystemPageData(views []systemView) systemPageData {
 	return d
 }
 
+// guestView is one Proxmox guest row. Card is the label of the configured
+// host that is this guest, so the row links to that card instead of repeating it.
+type guestView struct {
+	model.Guest
+	Card string `json:"card,omitempty"`
+}
+
 // systemViews includes available and required node exporters in /api/system.
 func systemViews(nodes []model.NodeData) []systemView {
-	out := make([]systemView, 0, len(nodes))
-	for _, node := range nodes {
-		if node.Exporters.Node.Visible() {
-			out = append(out, hostView(node))
-		}
-	}
-	return out
+	return slices.DeleteFunc(linkedViews(nodes), func(v systemView) bool {
+		return !v.Exporters.Node.Visible()
+	})
 }
 
 // hostViews keeps all configured hosts on the homepage, including hosts for
 // which automatic discovery has not found any exporters yet. Guests follow
 // their parent; otherwise configuration order is kept.
 func hostViews(nodes []model.NodeData) []systemView {
-	out := make([]systemView, 0, len(nodes))
-	for _, node := range nodes {
-		if node.Parent != "" {
+	views := linkedViews(nodes)
+	out := make([]systemView, 0, len(views))
+	for _, v := range views {
+		if v.Parent != "" {
 			continue
 		}
-		out = append(out, hostView(node))
-		for _, guest := range nodes {
-			if guest.Parent == node.Label {
-				out = append(out, hostView(guest))
+		out = append(out, v)
+		for _, guest := range views {
+			if guest.Parent == v.Label {
+				out = append(out, guest)
 			}
 		}
 	}
 	return out
+}
+
+// linkedViews builds host views in configuration order and joins them with
+// Proxmox guest data: a configured host whose label or hostname matches a
+// guest name gets that Proxmox host as its parent (unless parent is set in
+// the configuration) and its guest record. The guest row links to its card.
+// ponytail: name match only; add a vmid setting if names ever collide.
+func linkedViews(nodes []model.NodeData) []systemView {
+	type guestRef struct {
+		host  string
+		guest model.Guest
+	}
+	guests := map[string]guestRef{} // lowercase guest name
+	for _, n := range nodes {
+		for _, g := range n.Guests {
+			guests[strings.ToLower(g.Name)] = guestRef{host: n.Label, guest: g}
+		}
+	}
+	match := func(n model.NodeData) (guestRef, bool) {
+		names := []string{n.Label}
+		if n.System != nil && n.System.Hostname != "" {
+			names = append(names, n.System.Hostname)
+		}
+		for _, name := range names {
+			ref, ok := guests[strings.ToLower(name)]
+			if ok && ref.host != n.Label {
+				return ref, true
+			}
+		}
+		return guestRef{}, false
+	}
+	cards := map[string]string{} // guest id on a host -> configured card label
+	views := make([]systemView, len(nodes))
+	for i, n := range nodes {
+		views[i] = hostView(n)
+		if ref, ok := match(n); ok {
+			g := ref.guest
+			views[i].Proxmox = &g
+			views[i].Parent = cmp.Or(n.Parent, ref.host)
+			cards[ref.host+"/"+g.ID] = n.Label
+		}
+	}
+	for i := range views {
+		for j := range views[i].Guests {
+			views[i].Guests[j].Card = cards[views[i].Label+"/"+views[i].Guests[j].ID]
+		}
+	}
+	return views
 }
 
 // hostView builds the system row for one host.
@@ -175,7 +229,8 @@ func hostView(node model.NodeData) systemView {
 		Label:     node.Label,
 		Location:  node.Location,
 		Parent:    node.Parent,
-		Guests:    node.Guests,
+		Guests:    guestViews(node.Guests),
+		PVE:       node.PVE,
 		FetchedAt: node.FetchedAt,
 		Error:     node.Exporters.Node.Error,
 		System:    sys,
@@ -200,6 +255,7 @@ func nodeViews(nodes []model.NodeData) []nodeView {
 			Pools:        n.Pools,
 			Disks:        n.Disks,
 			System:       n.System,
+			PVEStorages:  pveStorages(n),
 		}
 	}
 	return views
@@ -220,4 +276,33 @@ func plural(n int, noun string) string {
 		return "1 " + noun
 	}
 	return strconv.Itoa(n) + " " + noun + "s"
+}
+
+// guestViews copies guests into rows that can carry a card link.
+func guestViews(guests []model.Guest) []guestView {
+	if len(guests) == 0 {
+		return nil
+	}
+	out := make([]guestView, len(guests))
+	for i, g := range guests {
+		out[i] = guestView{Guest: g}
+	}
+	return out
+}
+
+// pveStorages returns the Proxmox storages to show on the Storage page.
+// A zfspool storage repeats a ZFS exporter pool, so it is left out when the
+// ZFS exporter answers.
+func pveStorages(n model.NodeData) []model.PVEStorage {
+	if n.PVE == nil {
+		return nil
+	}
+	return slices.DeleteFunc(slices.Clone(n.PVE.Storages), func(s model.PVEStorage) bool {
+		return s.Type == "zfspool" && n.Exporters.ZFS.Available
+	})
+}
+
+// showOnStorage reports whether a host has a section on the Storage page.
+func showOnStorage(n model.NodeData) bool {
+	return n.Exporters.StorageVisible() || len(pveStorages(n)) > 0
 }

@@ -470,6 +470,24 @@
 .dataset-metric-value.hot { color: var(--warning); }
 
 /* ── Pool Grid ── */
+/* Proxmox storages that the ZFS exporter does not cover (LVM thin, PBS, NFS, dir) */
+.pve-storages {
+  margin-top: var(--space-4); padding: var(--space-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  display: grid; gap: var(--space-4);
+}
+@media (min-width: 720px) { .pve-storages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pve-storages-label {
+  grid-column: 1 / -1; font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint);
+}
+.pve-storage { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pve-storage-top { display: flex; align-items: baseline; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--text-xs); }
+.pve-storage-name { color: var(--text); font-weight: 600; }
+.pve-storage-type, .pve-storage-sub { color: var(--text-faint); font-size: 0.65rem; }
+.pve-storage-sub { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pve-storage-off { color: var(--error); font-size: 0.65rem; }
+.pve-storage-pct { margin-left: auto; color: var(--text); font-variant-numeric: tabular-nums; }
 .pools-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -753,6 +771,26 @@
     <div class="pools-grid">
       {{range $pi, $pool := $node.Pools}}
       {{template "poolCard" dict "pool" $pool "ni" $ni "pi" $pi}}
+      {{end}}
+    </div>
+    {{end}}
+
+    {{with $node.PVEStorages}}
+    <div class="pve-storages">
+      <div class="pve-storages-label">Proxmox storage</div>
+      {{range .}}
+      <div class="pve-storage">
+        <div class="pve-storage-top">
+          <span class="pve-storage-name">{{.Name}}</span>
+          <span class="pve-storage-type">{{.Type}}</span>
+          {{if not .Active}}<span class="pve-storage-off">inactive</span>{{end}}
+          <span class="pve-storage-pct">{{if gt .Total 0.0}}{{printf "%.0f%%" .UsedPct}}{{else}}n/a{{end}}</span>
+        </div>
+        <div class="bar-track" role="progressbar" aria-valuenow="{{printf "%.0f" .UsedPct}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{.Name}} {{printf "%.0f" .UsedPct}}% used">
+          <div class="bar-fill{{if gte .UsedPct 90.0}} bad{{else if gte .UsedPct 75.0}} warn{{end}}" data-width="{{printf "%.2f" .UsedPct}}" style="width:0%"></div>
+        </div>
+        <div class="pve-storage-sub">{{if gt .Total 0.0}}{{humanBytes .Used}} of {{humanBytes .Total}}{{else}}no size reported{{end}} &middot; {{.Content}}</div>
+      </div>
       {{end}}
     </div>
     {{end}}

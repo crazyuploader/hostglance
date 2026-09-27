@@ -45,17 +45,29 @@
 .guest-kind { color: var(--text-faint); font-size: 0.6rem; letter-spacing: 0.04em; }
 .sys-row.guest-row {
   display: grid; align-items: baseline; column-gap: var(--space-3);
-  grid-template-columns: 7px minmax(0, 1fr) auto auto;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
   font-variant-numeric: tabular-nums;
 }
 .guest-row .sys-row-val { text-align: right; }
 .guest-up { display: none; }
+/* below 1200px: memory and disk drop to lines under the name */
+.guest-row .guest-mem, .guest-row .guest-disk { grid-column: 2 / -1; text-align: left; }
+.guest-disk:empty { display: none; }
+/* the name cell wraps so its flags stay readable */
+.guest-row .sys-row-name { white-space: normal; }
+.guest-flag { white-space: nowrap; font-size: 0.6rem; letter-spacing: 0.03em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-full); padding: 0 6px; }
+.guest-flag.warn { color: var(--warning); border-color: color-mix(in oklab, var(--warning) 40%, transparent); }
 .guest-stopped { grid-column: 3 / -1; }
-@media (min-width: 640px) {
-  .sys-row.guest-row { grid-template-columns: 7px minmax(0, 1fr) 13ch 24ch 11ch; }
+@media (min-width: 1200px) { /* one line per guest only when the name column has room */
+  .sys-row.guest-row { grid-template-columns: 7px minmax(0, 1fr) 13ch 29ch 31ch 11ch; }
+  .guest-row .sys-row-name { white-space: nowrap; }
+  .guest-disk:empty { display: block; }
   .guest-up { display: block; }
+  .guest-row .guest-mem, .guest-row .guest-disk { grid-column: auto; text-align: right; }
 }
 .guest-row.off .sys-row-name { color: var(--text-muted); }
+.guest-link { color: inherit; text-decoration: underline; text-decoration-color: var(--border-hi); text-underline-offset: 3px; }
+.guest-link:hover { text-decoration-color: currentColor; }
 .sys-row-val.warn b { color: var(--warning); }
 .sys-row-val.bad b { color: var(--error); }
 .net-virtual { margin-top: var(--space-3); }
@@ -228,12 +240,12 @@
   </div>
 
   {{range $i, $node := .Nodes}}
-  <section class="sys-card {{if $node.Parent}}sys-card-guest{{end}} {{if $node.Exporters.HasErrors}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">
+  <section id="host-{{$node.Label | urlquery}}" class="sys-card {{if $node.Parent}}sys-card-guest{{end}} {{if $node.Exporters.HasErrors}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">
 
     <div class="sys-head">
       {{$title := hostTitle $node.Label $node.System}}
       <div class="sys-hostname">{{$title}}</div>
-      {{if $node.Parent}}<div class="sys-guest-of">on {{$node.Parent}}</div>{{end}}
+      {{if $node.Parent}}<div class="sys-guest-of">{{with $node.Proxmox}}{{.Kind}} {{.VMID}} {{end}}on {{$node.Parent}}</div>{{end}}
       {{if ne $title $node.Label}}<div class="sys-location">{{$node.Label}}</div>{{end}}
       {{if $node.Location}}<div class="sys-location">{{$node.Location}}</div>{{end}}
       <div class="sys-head-spacer"></div>
@@ -244,6 +256,7 @@
         {{if .Kernel}}<span class="sys-badge">{{.Kernel}}</span>{{end}}
         {{if gt .UptimeSecs 0.0}}<span class="sys-badge">up {{fmtUptime .UptimeSecs}}</span>{{end}}
         {{if .ExporterVersion}}<span class="sys-badge">node-exporter {{.ExporterVersion}}</span>{{end}}
+        {{with $node.PVE}}{{if .Version}}<span class="sys-badge">PVE {{.Version}}</span>{{end}}{{end}}
       </div>
       {{end}}
     </div>
@@ -254,7 +267,10 @@
     {{if or $node.PoolCount $node.DiskCount}}
     <div class="sys-storage"><a href="/storage">Storage</a> &middot; {{plural $node.PoolCount "pool"}} &middot; {{plural $node.DiskCount "disk"}}</div>
     {{end}}
-    {{if and (not $node.System) (not $node.Error)}}
+    {{with $node.Proxmox}}{{if not .Running}}
+    <div class="sys-discovery">Proxmox reports this {{.Kind}} as stopped.</div>
+    {{end}}{{end}}
+    {{if and (not $node.System) (not $node.Error) (not (and $node.Proxmox (not $node.Proxmox.Running)))}}
     <div class="sys-discovery">
       {{if $node.FetchedAt.IsZero}}Looking for exporters…{{else if $node.Exporters.AnyAvailable}}No system metrics reported.{{else if $node.Exporters.HasErrors}}No system exporter detected.{{else}}No exporters detected.{{end}}
     </div>
@@ -387,16 +403,19 @@
 
     {{with $node.Guests}}
     <div class="sys-block sys-guests">
-      <div class="sys-block-label">Proxmox guests &middot; {{len .}}</div>
+      <div class="sys-block-label">Proxmox guests &middot; {{len .}}{{with $node.PVE}}{{if and .BackupChecked .NotBackedUp}} &middot; <span class="guest-flag warn">{{.NotBackedUp}} without backup</span>{{end}}{{end}}</div>
       <div class="sys-rows">
         {{range .}}
         <div class="sys-row guest-row {{if not .Running}}off{{end}}">
           <span class="guest-dot {{if .Running}}on{{end}}" aria-hidden="true"></span>
-          <span class="sys-row-name" title="{{.ID}}">{{.Name}} <span class="guest-kind">{{.Kind}}</span></span>
+          <span class="sys-row-name" title="{{.ID}}">{{if .Card}}<a class="guest-link" href="#host-{{.Card | urlquery}}">{{.Name}}</a>{{else}}{{.Name}}{{end}} <span class="guest-kind">{{.Kind}}</span>{{if .NoBackup}} <span class="guest-flag warn">no backup</span>{{end}}{{if .Lock}} <span class="guest-flag">{{.Lock}} lock</span>{{end}}</span>
           {{if .Running}}
           <span class="sys-row-val {{pctClass .CPUPct}}">cpu <b>{{printf "%.0f" .CPUPct}}%</b> of {{printf "%.0f" .Cores}}</span>
-          <span class="sys-row-val {{pctClass .MemPct}}">mem <b>{{humanBytes .MemUsed}}</b> / {{humanBytes .MemTotal}}</span>
+          <span class="sys-row-val guest-mem {{pctClass .MemPct}}">mem <b>{{humanBytes .MemUsed}}</b> / {{humanBytes .MemTotal}}</span>
+          {{if gt .DiskUsed 0.0}}<span class="sys-row-val guest-disk {{pctClass .DiskPct}}">disk <b>{{humanBytes .DiskUsed}}</b> / {{humanBytes .DiskTotal}}</span>{{else}}<span class="guest-disk"></span>{{end}}
           <span class="sys-row-val sys-dim guest-up">up {{fmtUptime .UptimeSecs}}</span>
+          {{else if .NeedsStart}}
+          <span class="sys-row-val guest-stopped bad"><b>stopped, starts at boot</b></span>
           {{else}}
           <span class="sys-row-val sys-dim guest-stopped">stopped</span>
           {{end}}

@@ -38,3 +38,45 @@ func TestExtractGuests(t *testing.T) {
 		t.Errorf("container = %+v", ct)
 	}
 }
+
+func TestExtractPVEExtras(t *testing.T) {
+	s := func(name string, v float64, labels ...string) parser.Sample {
+		m := map[string]string{}
+		for i := 0; i+1 < len(labels); i += 2 {
+			m[labels[i]] = labels[i+1]
+		}
+		return parser.Sample{Name: name, Labels: m, Value: v}
+	}
+	samples := []parser.Sample{
+		s("pve_guest_info", 1, "id", "lxc/307", "name", "docker-runner", "type", "lxc", "template", "0"),
+		s("pve_guest_info", 1, "id", "qemu/301", "name", "vm", "type", "qemu", "template", "0"),
+		s("pve_up", 0, "id", "qemu/301"),
+		s("pve_onboot_status", 1, "id", "qemu/301"),
+		s("pve_lock_state", 0, "id", "lxc/307", "state", "migrate"),
+		s("pve_lock_state", 1, "id", "lxc/307", "state", "backup"),
+		s("pve_not_backed_up_info", 1, "id", "lxc/307"),
+		s("pve_disk_usage_bytes", 25, "id", "lxc/307"),
+		s("pve_disk_size_bytes", 100, "id", "lxc/307"),
+		s("pve_version_info", 1, "version", "9.2.20"),
+		s("pve_not_backed_up_total", 1, "id", "cluster/PVE02"),
+		s("pve_storage_info", 1, "id", "storage/PVE02/local-lvm", "storage", "local-lvm", "plugintype", "lvmthin", "content", "images,rootdir"),
+		s("pve_up", 1, "id", "storage/PVE02/local-lvm"),
+		s("pve_disk_usage_bytes", 37, "id", "storage/PVE02/local-lvm"),
+		s("pve_disk_size_bytes", 100, "id", "storage/PVE02/local-lvm"),
+	}
+	g := ExtractGuests(samples)
+	ct, vm := g[0], g[1]
+	if !ct.NoBackup || ct.Lock != "backup" || ct.DiskPct() != 25 {
+		t.Errorf("container = %+v", ct)
+	}
+	if !vm.NeedsStart() || vm.NoBackup || vm.Lock != "" {
+		t.Errorf("vm = %+v", vm)
+	}
+	info := ExtractPVEInfo(samples)
+	if info.Version != "9.2.20" || !info.BackupChecked || info.NotBackedUp != 1 || len(info.Storages) != 1 {
+		t.Fatalf("info = %+v", info)
+	}
+	if st := info.Storages[0]; st.Name != "local-lvm" || st.Type != "lvmthin" || !st.Active || st.UsedPct() != 37 {
+		t.Errorf("storage = %+v", st)
+	}
+}

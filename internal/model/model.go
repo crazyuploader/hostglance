@@ -136,6 +136,7 @@ type NodeData struct {
 	Pools        []Pool           `json:"pools"`
 	Disks        []DiskInfo       `json:"disks,omitempty"`
 	Guests       []Guest          `json:"guests,omitempty"`
+	PVE          *PVEInfo         `json:"pve,omitempty"`
 	System       *SystemInfo      `json:"system,omitempty"`
 }
 

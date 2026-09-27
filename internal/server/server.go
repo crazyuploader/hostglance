@@ -143,7 +143,7 @@ func Start(cfg *config.Config) error {
 	app := newFiberApp(cfg)
 
 	rl := limiter.New(limiter.Config{
-		Max:        60,
+		Max:        300,
 		Expiration: 1 * time.Minute,
 	})
 
@@ -262,7 +262,7 @@ func registerSSERoute(app *fiber.App, hub *Hub) {
 	// Long-lived connections get their own, stricter limiter; the real
 	// resource to protect is concurrent connections, capped via hub.add.
 	sseLimiter := limiter.New(limiter.Config{
-		Max:        10,
+		Max:        60,
 		Expiration: 1 * time.Minute,
 	})
 	app.Get("/events", sseLimiter, func(c fiber.Ctx) error {
@@ -533,7 +533,7 @@ func setupLogger(cfg *config.Config) {
 func buildTemplateData(nodes []model.NodeData) templateData {
 	storage := make([]model.NodeData, 0, len(nodes))
 	for _, node := range nodes {
-		if node.Exporters.StorageVisible() {
+		if showOnStorage(node) {
 			storage = append(storage, node)
 		}
 	}
@@ -622,6 +622,15 @@ func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *co
 			overThreshold = append(overThreshold, pool.Name)
 		}
 	}
+	// Proxmox storages that the ZFS exporter does not cover (LVM thin, PBS, NFS, dir).
+	var inactiveStorages, fullStorages []string
+	for _, st := range pveStorages(*node) {
+		if !st.Active {
+			inactiveStorages = append(inactiveStorages, st.Name)
+		} else if cfg.MaxUsagePercent > 0 && st.UsedPct() > cfg.MaxUsagePercent {
+			fullStorages = append(fullStorages, st.Name)
+		}
+	}
 
 	status := fiber.StatusOK
 	state := "up"
@@ -641,6 +650,14 @@ func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *co
 		state = "degraded"
 		reason = "pool_over_threshold"
 		slog.Debug("node has pools over threshold", "label", label, "pools", overThreshold, "threshold", cfg.MaxUsagePercent)
+	case len(inactiveStorages) > 0:
+		status = fiber.StatusServiceUnavailable
+		state = "degraded"
+		reason = "storage_inactive"
+	case len(fullStorages) > 0:
+		status = fiber.StatusServiceUnavailable
+		state = "degraded"
+		reason = "storage_over_threshold"
 	case !node.Exporters.AnyAvailable():
 		state = "unknown"
 		reason = "no_exporters_detected"
@@ -659,6 +676,12 @@ func nodeHealthResponse(c fiber.Ctx, node *model.NodeData, label string, cfg *co
 	}
 	if len(overThreshold) > 0 {
 		res["over_threshold_pools"] = overThreshold
+	}
+	if len(inactiveStorages) > 0 {
+		res["inactive_storages"] = inactiveStorages
+	}
+	if len(fullStorages) > 0 {
+		res["over_threshold_storages"] = fullStorages
 	}
 
 	return c.Status(status).JSON(res)

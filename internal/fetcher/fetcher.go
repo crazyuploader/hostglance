@@ -325,6 +325,9 @@ func (f *Fetcher) fetchOne(ctx context.Context, host config.Host) model.NodeData
 	nd.Disks = model.ExtractDisks(smartctl.samples)
 	nd.SmartctlInfo = model.ExtractSmartctlInfo(smartctl.samples)
 	nd.Guests = model.ExtractGuests(pve.samples)
+	if pve.status.Available {
+		nd.PVE = model.ExtractPVEInfo(pve.samples)
+	}
 
 	var problems []string
 	for _, source := range []struct {
