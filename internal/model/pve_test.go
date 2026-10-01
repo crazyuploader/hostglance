@@ -58,11 +58,11 @@ func TestExtractPVEExtras(t *testing.T) {
 		s("pve_disk_usage_bytes", 25, "id", "lxc/307"),
 		s("pve_disk_size_bytes", 100, "id", "lxc/307"),
 		s("pve_version_info", 1, "version", "9.2.20"),
-		s("pve_not_backed_up_total", 1, "id", "cluster/PVE02"),
-		s("pve_storage_info", 1, "id", "storage/PVE02/local-lvm", "storage", "local-lvm", "plugintype", "lvmthin", "content", "images,rootdir"),
-		s("pve_up", 1, "id", "storage/PVE02/local-lvm"),
-		s("pve_disk_usage_bytes", 37, "id", "storage/PVE02/local-lvm"),
-		s("pve_disk_size_bytes", 100, "id", "storage/PVE02/local-lvm"),
+		s("pve_not_backed_up_total", 1, "id", "cluster/node1"),
+		s("pve_storage_info", 1, "id", "storage/node1/local-lvm", "storage", "local-lvm", "plugintype", "lvmthin", "content", "images,rootdir"),
+		s("pve_up", 1, "id", "storage/node1/local-lvm"),
+		s("pve_disk_usage_bytes", 37, "id", "storage/node1/local-lvm"),
+		s("pve_disk_size_bytes", 100, "id", "storage/node1/local-lvm"),
 	}
 	g := ExtractGuests(samples)
 	ct, vm := g[0], g[1]

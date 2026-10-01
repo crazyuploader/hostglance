@@ -401,6 +401,89 @@ func TestHealthResponsePreChecks(t *testing.T) {
 	}
 }
 
+func TestDiskHealthResponse(t *testing.T) {
+	t.Parallel()
+	ok := model.DiskInfo{Device: "ata-EXAMPLE_DISK_WD-OK", SerialNumber: "WD-OK", SmartPassed: true, HasExitStatus: true}
+	bad := model.DiskInfo{Device: "ata-WDC_BAD", SerialNumber: "WD-BAD", SmartPassed: false}
+	gone := model.DiskInfo{Device: "ata-WDC_GONE", SerialNumber: "WD-GONE", SmartPassed: true, HasExitStatus: true, ExitStatus: 2}
+	logErr := model.DiskInfo{Device: "ata-WDC_LOG", SerialNumber: "WD-LOG", SmartPassed: true, HasExitStatus: true, ExitStatus: 128}
+	node := model.NodeData{
+		Label: "host", FetchedAt: time.Now(), Disks: []model.DiskInfo{ok, bad, gone, logErr},
+		System: &model.SystemInfo{DiskSerials: []string{"WD-OK", "WD-BAD", "WD-GONE", "WD-LOG"}},
+	}
+	removed := node
+	removed.System = &model.SystemInfo{DiskSerials: []string{"WD-OK"}}
+	noSerials := node
+	noSerials.System = &model.SystemInfo{}
+	noNode := node
+	noNode.System = nil
+	tests := []struct {
+		name       string
+		node       model.NodeData
+		disk       string
+		wantStatus int
+		wantReason string
+	}{
+		{"discovery pending", model.NodeData{Label: "host"}, "WD-OK", http.StatusServiceUnavailable, "discovery_pending"},
+		{"by serial", node, "WD-OK", http.StatusOK, ""},
+		{"by device", node, "ata-EXAMPLE_DISK_WD-OK", http.StatusOK, ""},
+		{"missing", node, "WD-NOPE", http.StatusServiceUnavailable, "disk_not_found"},
+		{"smart failed", node, "WD-BAD", http.StatusServiceUnavailable, "smart_failed"},
+		{"open failed", node, "WD-GONE", http.StatusServiceUnavailable, "disk_unreachable"},
+		{"log errors only", node, "WD-LOG", http.StatusOK, ""},
+		{"stale SMART, disk removed", removed, "WD-LOG", http.StatusServiceUnavailable, "disk_not_found"},
+		{"node exporter has no serials", noSerials, "WD-OK", http.StatusServiceUnavailable, "presence_unknown"},
+		{"node exporter down", noNode, "WD-OK", http.StatusServiceUnavailable, "presence_unknown"},
+		{
+			"exporter failed",
+			model.NodeData{Label: "host", FetchedAt: time.Now(), Exporters: model.ExporterStatuses{
+				Smartctl: model.ExporterStatus{Mode: "enabled", Error: "unreachable"},
+			}},
+			"WD-OK", http.StatusServiceUnavailable, "exporter_unavailable",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			app := fiber.New()
+			app.Get("/", func(c fiber.Ctx) error { return diskHealthResponse(c, &tt.node, tt.disk) })
+			resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/", http.NoBody))
+			if err != nil {
+				t.Fatalf("app.Test: %v", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			body := map[string]any{}
+			if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if resp.StatusCode != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode, tt.wantStatus)
+			}
+			if got, _ := body["reason"].(string); got != tt.wantReason {
+				t.Errorf("reason = %v, want %q", body["reason"], tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestExitStatusDesc(t *testing.T) {
+	t.Parallel()
+	for code, want := range map[float64]string{
+		0:   "",
+		2:   "device open failed",
+		4:   "SMART command failed",
+		8:   "disk failing",
+		64:  "error log has errors",
+		128: "self-test errors",
+		192: "error log has errors, self-test errors",
+		256: "code 256",
+	} {
+		if got := exitStatusDesc(code); got != want {
+			t.Errorf("exitStatusDesc(%v) = %q, want %q", code, got, want)
+		}
+	}
+}
+
 func TestRestartOnlyChanges(t *testing.T) {
 	t.Parallel()
 	old := &config.Config{Addr: ":8054", CacheTTL: time.Minute, TrustedProxies: []string{"10.0.0.1"}}

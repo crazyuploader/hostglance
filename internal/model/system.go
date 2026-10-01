@@ -83,6 +83,10 @@ type SystemInfo struct {
 	Nets        []NetDev     `json:"nets,omitempty"`
 	Temps       []TempSensor `json:"temps,omitempty"`
 
+	// DiskSerials lists the serial numbers in node_disk_info. The kernel
+	// reports them live, so a removed disk leaves the list at the next scrape.
+	DiskSerials []string `json:"disk_serials,omitempty"`
+
 	Counters *SystemCounters `json:"-"`
 }
 
@@ -232,6 +236,10 @@ func ExtractSystem(samples []parser.Sample) *SystemInfo {
 				sensorLabels[chip] = map[string]string{}
 			}
 			sensorLabels[chip][s.Labels["sensor"]] = s.Labels["label"]
+		case "node_disk_info":
+			if serial := s.Labels["serial"]; serial != "" {
+				sys.DiskSerials = append(sys.DiskSerials, serial)
+			}
 		case "node_uname_info":
 			sys.Hostname = s.Labels["nodename"]
 			sys.Kernel = s.Labels["release"]

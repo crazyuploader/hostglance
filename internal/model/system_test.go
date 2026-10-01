@@ -53,7 +53,9 @@ node_hwmon_chip_names{chip="nvme_nvme0",chip_name="nvme"} 1
 node_hwmon_chip_names{chip="platform_coretemp_0",chip_name="coretemp"} 1
 node_hwmon_sensor_label{chip="platform_coretemp_0",label="Package id 0",sensor="temp1"} 1
 node_hwmon_sensor_label{chip="nvme_nvme0",label="Composite",sensor="temp1"} 1
-node_uname_info{domainname="(none)",machine="x86_64",nodename="PVE02",release="7.0.14-5-pve",sysname="Linux",version="#1"} 1
+node_disk_info{device="sdc",major="8",minor="32",model="EXAMPLE_DISK",path="pci-0000:00:01.0-ata-1",revision="1.0",rotational="1",serial="SN0001",wwn="0x5000000000000001"} 1
+node_disk_info{device="dm-0",major="252",minor="0",model="",path="",revision="",rotational="0",serial="",wwn=""} 1
+node_uname_info{domainname="(none)",machine="x86_64",nodename="node1",release="7.0.14-5-pve",sysname="Linux",version="#1"} 1
 node_os_info{id="debian",name="Debian GNU/Linux",pretty_name="Debian GNU/Linux 13 (trixie)",version_id="13"} 1
 node_exporter_build_info{branch="HEAD",goarch="amd64",goos="linux",goversion="go1.26.1",revision="0dd664d",version="1.11.1"} 1
 `
@@ -74,8 +76,8 @@ func TestExtractSystem(t *testing.T) {
 		t.Fatal("ExtractSystem returned nil")
 	}
 
-	if sys.Hostname != "PVE02" {
-		t.Errorf("Hostname = %q, want PVE02", sys.Hostname)
+	if sys.Hostname != "node1" {
+		t.Errorf("Hostname = %q, want node1", sys.Hostname)
 	}
 	if sys.Kernel != "7.0.14-5-pve" {
 		t.Errorf("Kernel = %q", sys.Kernel)
@@ -131,6 +133,11 @@ func TestExtractSystem(t *testing.T) {
 	}
 	if sys.Temps[1].Chip != "nvme" || sys.Temps[1].Label != "Composite" {
 		t.Errorf("second temp = %+v", sys.Temps[1])
+	}
+
+	// Disk serials: only devices that report one.
+	if len(sys.DiskSerials) != 1 || sys.DiskSerials[0] != "SN0001" {
+		t.Errorf("DiskSerials = %v", sys.DiskSerials)
 	}
 
 	// Raw counters captured for the rate tracker.

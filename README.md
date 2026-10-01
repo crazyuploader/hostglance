@@ -267,6 +267,7 @@ The container must be able to connect to each host and exporter URL. Inside the 
 | `GET /api/history/query?key=&from=&to=&bucket=` | Data for one series. Needs history.                                   |
 | `GET /api/health/:label`                        | Host health, from exporter requirements and pool health               |
 | `GET /api/health/:label/:pool`                  | Pool health                                                           |
+| `GET /api/health/:label/disk/:disk`             | Disk health, by serial number or by-id device name                    |
 | `GET /health`                                   | Shows that the app runs. It does not depend on the exporters.         |
 
 In `/api/metrics`, each host has an `exporters` object with a status for `node`, `zfs`, and `smartctl`. Each status has a `mode` and an `available` value. It also has an `error` when an `enabled` exporter fails. An `auto` exporter that does not respond has no error.
@@ -294,7 +295,19 @@ An `unknown` status is neutral. The exporters alone cannot show whether the mach
 
 `GET /api/health/:label/:pool` also returns `503` with `status: unknown` and `reason: discovery_pending` before the first collection finishes. After that, it returns `503` if ZFS does not respond, if the pool is missing or unhealthy, or if the pool usage is above `max_usage_percent`. A failure of the node or SMART exporter does not fail the check of a healthy pool.
 
-For example: `GET /api/health/node-1` and `GET /api/health/node-1/tank`.
+`GET /api/health/:label/disk/:disk` finds the disk in the SMART data by its serial number or its device name, for example `SN0001` or `ata-EXAMPLE_DISK_SN0001`. It returns `503` with one of these reasons:
+
+- `exporter_unavailable`: the SMART exporter is `enabled` and does not respond.
+- `disk_not_found`: the SMART exporter does not report the disk, or node_exporter does not list its serial number in `node_disk_info`. For example, the disk is removed or offline.
+- `disk_unreachable`: smartctl cannot open or read the disk (exit status bits 0 to 2).
+- `smart_failed`: the SMART health check of the disk fails.
+- `presence_unknown` (with `status: unknown`): node_exporter does not respond or reports no serial numbers in `node_disk_info`, so HostGlance cannot confirm that the disk is connected.
+
+Other exit status bits, such as errors in the error log, do not fail the check. The Storage page shows them.
+
+smartctl_exporter keeps the last data of a removed disk until the exporter restarts. For this reason, the check also uses `node_disk_info` from node_exporter, which the kernel updates at each scrape. The disk check therefore needs both exporters. Without node_exporter serial numbers, it fails with `presence_unknown` instead of trusting old SMART data.
+
+For example: `GET /api/health/node-1`, `GET /api/health/node-1/tank`, and `GET /api/health/node-1/disk/SN0001`.
 
 ## Development
 

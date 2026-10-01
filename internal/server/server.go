@@ -342,6 +342,59 @@ func registerAPIRoutes(app *fiber.App, f *fetcher.Fetcher, rl fiber.Handler, cfg
 		curCfg := cfgPtr.Load()
 		return serveHealthCheck(c, f, c.Params("label"), c.Params("pool"), curCfg)
 	})
+
+	app.Get("/api/health/:label/disk/:disk", rl, func(c fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(c.Context(), httpHandlerTimeout)
+		defer cancel()
+		nodes, isCached := f.FetchAll(ctx)
+		setCacheHeaders(c, f, isCached)
+		node, err := findNodeByLabel(nodes, c.Params("label"))
+		if err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"status": "not_found", "label": c.Params("label")})
+		}
+		return diskHealthResponse(c, node, c.Params("disk"))
+	})
+}
+
+// diskHealthResponse checks one disk by serial number or by-id device name.
+// A disk that smartctl cannot reach (exit status bits 0-2) counts as missing.
+// smartctl_exporter keeps the last good data of a removed disk until it
+// restarts, so presence comes from node_disk_info. Without those serials the
+// check fails: SMART data alone cannot show that the disk is still there.
+func diskHealthResponse(c fiber.Ctx, node *model.NodeData, id string) error {
+	if node.FetchedAt.IsZero() {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"status": "unknown", "reason": "discovery_pending", "label": node.Label,
+		})
+	}
+	res := fiber.Map{"status": "down", "label": node.Label, "location": node.Location, "disk": id}
+	if node.Exporters.Smartctl.Error != "" {
+		res["reason"] = "exporter_unavailable"
+		return c.Status(fiber.StatusServiceUnavailable).JSON(res)
+	}
+	i := slices.IndexFunc(node.Disks, func(d model.DiskInfo) bool {
+		return d.SerialNumber == id || d.Device == id
+	})
+	if i < 0 {
+		res["reason"] = "disk_not_found"
+		return c.Status(fiber.StatusServiceUnavailable).JSON(res)
+	}
+	d := node.Disks[i]
+	res["device"], res["serial_number"], res["model_name"] = d.Device, d.SerialNumber, d.ModelName
+	switch {
+	case node.System == nil || len(node.System.DiskSerials) == 0:
+		res["status"], res["reason"] = "unknown", "presence_unknown"
+	case !slices.Contains(node.System.DiskSerials, d.SerialNumber):
+		res["reason"] = "disk_not_found"
+	case d.HasExitStatus && int(d.ExitStatus)&0b111 != 0:
+		res["reason"] = "disk_unreachable"
+	case !d.SmartPassed:
+		res["reason"] = "smart_failed"
+	default:
+		res["status"] = "up"
+		return c.JSON(res)
+	}
+	return c.Status(fiber.StatusServiceUnavailable).JSON(res)
 }
 
 func registerDashboardRoute(app *fiber.App, f *fetcher.Fetcher, tmpl *template.Template, cfgPtr *atomic.Pointer[config.Config], histStore *history.Store) {
@@ -880,31 +933,27 @@ func fmtSpeed(bps float64) string {
 	}
 }
 
+// exitStatusBits names the smartctl exit status bits, from bit 0, as smartctl(8) lists them.
+var exitStatusBits = []string{
+	"command line error",
+	"device open failed",
+	"SMART command failed",
+	"disk failing",
+	"prefail attributes",
+	"prev failed attributes",
+	"error log has errors",
+	"self-test errors",
+}
+
 func exitStatusDesc(code float64) string {
 	n := int(code)
-	if n == 0 {
-		return ""
-	}
 	var parts []string
-	if n&(1<<1) != 0 {
-		parts = append(parts, "device failure")
+	for i, name := range exitStatusBits {
+		if n&(1<<i) != 0 {
+			parts = append(parts, name)
+		}
 	}
-	if n&(1<<2) != 0 {
-		parts = append(parts, "disk failing")
-	}
-	if n&(1<<3) != 0 {
-		parts = append(parts, "prefail attributes")
-	}
-	if n&(1<<4) != 0 {
-		parts = append(parts, "prev failed attributes")
-	}
-	if n&(1<<5) != 0 {
-		parts = append(parts, "error log has errors")
-	}
-	if n&(1<<6) != 0 {
-		parts = append(parts, "self-test errors")
-	}
-	if len(parts) == 0 {
+	if len(parts) == 0 && n != 0 {
 		return fmt.Sprintf("code %d", n)
 	}
 	return strings.Join(parts, ", ")
