@@ -170,7 +170,9 @@
 .temp-chip.warm b { color: var(--warning); }
 .temp-chip.hot  b { color: var(--error); }
 .sys-storage, .sys-discovery { padding: 0 0 var(--space-4); color: var(--text-muted); font-size: var(--text-sm); }
-.sys-storage a { color: var(--accent); }
+.sys-storage a, .status a, .gauge-sub a, .sys-guest-of a { color: inherit; text-decoration: underline; text-decoration-color: var(--border-hi); text-underline-offset: 3px; }
+.sys-storage a:hover, .status a:hover, .gauge-sub a:hover, .sys-guest-of a:hover { text-decoration-color: currentColor; color: var(--primary); }
+.status .bad a:hover { color: var(--error); }
 
 /* ── Status line ── */
 .status { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); margin: 0 0 var(--space-5); padding: 0; font-size: var(--text-sm); }
@@ -262,25 +264,25 @@ a.ft-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px
   {{else}}
 
   <ul class="status animate-in animate-in-delayed-1" aria-label="Fleet status">
-    <li class="{{if eq .Reporting .TotalNodes}}ok{{else}}warn{{end}}"><i></i>{{.Reporting}} of {{plural .TotalNodes "host"}} reporting{{if .GuestNodes}}, {{.GuestNodes}} of them guests{{end}}</li>
-    <li class="{{if .ExporterErrors}}bad{{else}}ok{{end}}"><i></i>{{if .ExporterErrors}}{{plural .ExporterErrors "host"}} with a failed required exporter{{else}}No exporter errors{{end}}</li>
+    <li class="{{if eq .Reporting .TotalNodes}}ok{{else}}warn{{end}}"><i></i><span>{{if and .FirstSilent (ne .Reporting .TotalNodes)}}<a href="#host-{{.FirstSilent | urlquery}}">{{.Reporting}} of {{plural .TotalNodes "host"}} reporting</a>{{else}}{{.Reporting}} of {{plural .TotalNodes "host"}} reporting{{end}}{{if .GuestNodes}}, {{.GuestNodes}} of them guests{{end}}</span></li>
+    <li class="{{if .ExporterErrors}}bad{{else}}ok{{end}}"><i></i>{{if .ExporterErrors}}<a href="#host-{{.FirstError | urlquery}}">{{plural .ExporterErrors "host"}} with a failed required exporter</a>{{else}}No exporter errors{{end}}</li>
   </ul>
 
   <div class="gauges animate-in animate-in-delayed-1" role="region" aria-label="Fleet load">
     <div class="gauge">
       <div class="gauge-top"><span>CPU, fleet average</span><b class="{{if .HasCPU}}{{pctClass .AvgCPUPct}}{{end}}">{{if .HasCPU}}{{printf "%.0f%%" .AvgCPUPct}}{{else}}n/a{{end}}</b></div>
       <div class="fmeter"><i class="{{pctClass .AvgCPUPct}}" style="width:{{if .HasCPU}}{{printf "%.1f" .AvgCPUPct}}{{else}}0{{end}}%"></i></div>
-      <div class="gauge-sub">{{plural .TotalCores "core"}}{{if .GuestNodes}}, guests not counted{{end}}</div>
+      <div class="gauge-sub">{{plural .TotalCores "core"}}{{if .GuestNodes}}, guests not counted{{end}}{{if .HistoryEnabled}} &middot; <a href="/history?view=cpu">history</a>{{end}}</div>
     </div>
     <div class="gauge">
       <div class="gauge-top"><span>Memory</span><b class="{{if gt .MemTotal 0.0}}{{pctClass (mul100 (percent .MemUsedBytes .MemTotal))}}{{end}}">{{if gt .MemTotal 0.0}}{{printf "%.0f%%" (mul100 (percent .MemUsedBytes .MemTotal))}}{{else}}n/a{{end}}</b></div>
       <div class="fmeter"><i class="{{pctClass (mul100 (percent .MemUsedBytes .MemTotal))}}" style="width:{{printf "%.1f" (mul100 (percent .MemUsedBytes .MemTotal))}}%"></i></div>
-      <div class="gauge-sub">{{humanBytes .MemUsedBytes}} of {{humanBytes .MemTotal}}</div>
+      <div class="gauge-sub">{{humanBytes .MemUsedBytes}} of {{humanBytes .MemTotal}}{{if .HistoryEnabled}} &middot; <a href="/history?view=mem">history</a>{{end}}</div>
     </div>
     <div class="gauge">
       <div class="gauge-top"><span>Hottest sensor</span><b class="{{if gt .MaxTempC 0.0}}{{tempClass .MaxTempC}}{{end}}">{{if gt .MaxTempC 0.0}}{{printf "%.0f" .MaxTempC}}&deg;C{{else}}n/a{{end}}</b></div>
       <div class="fmeter thermo"><i class="{{tempClass .MaxTempC}}" style="width:{{tempBarPct .MaxTempC 90.0}}%"></i></div>
-      <div class="gauge-sub">amber above 45, red above 55</div>
+      <div class="gauge-sub">{{if .HottestHost}}on <a href="#host-{{.HottestHost | urlquery}}">{{.HottestHost}}</a>, {{end}}amber above 45, red above 55</div>
     </div>
   </div>
 
@@ -311,7 +313,7 @@ a.ft-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px
     <div class="sys-head">
       {{$title := hostTitle $node.Label $node.System}}
       <div class="sys-hostname">{{$title}}</div>
-      {{if $node.Parent}}<div class="sys-guest-of">{{with $node.Proxmox}}{{.Kind}} {{.VMID}} {{end}}on {{$node.Parent}}</div>{{end}}
+      {{if $node.Parent}}<div class="sys-guest-of">{{with $node.Proxmox}}{{.Kind}} {{.VMID}} {{end}}on <a href="#host-{{$node.Parent | urlquery}}">{{$node.Parent}}</a></div>{{end}}
       {{if ne $title $node.Label}}<div class="sys-location">{{$node.Label}}</div>{{end}}
       {{if $node.Location}}<div class="sys-location">{{$node.Location}}</div>{{end}}
       <div class="sys-head-spacer"></div>
@@ -330,8 +332,11 @@ a.ft-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px
     {{if $node.Exporters.ZFS.Error}}<div class="sys-err">Required ZFS exporter {{$node.Exporters.ZFS.Error}}</div>{{end}}
     {{if $node.Exporters.Smartctl.Error}}<div class="sys-err">Required SMART exporter {{$node.Exporters.Smartctl.Error}}</div>{{end}}
     {{if $node.Exporters.PVE.Error}}<div class="sys-err">Required PVE exporter {{$node.Exporters.PVE.Error}}</div>{{end}}
-    {{if or $node.PoolCount $node.DiskCount}}
-    <div class="sys-storage"><a href="/storage">Storage</a> &middot; {{plural $node.PoolCount "pool"}} &middot; {{plural $node.DiskCount "disk"}}</div>
+    {{if or $node.PoolCount $node.DiskCount (and $.HistoryEnabled $node.System)}}
+    <div class="sys-storage">
+      {{if or $node.PoolCount $node.DiskCount}}<a href="/storage#storage-host-{{$node.Label | urlquery}}">Storage</a> &middot; {{plural $node.PoolCount "pool"}} &middot; {{plural $node.DiskCount "disk"}}{{end}}
+      {{if and $.HistoryEnabled $node.System}}{{if or $node.PoolCount $node.DiskCount}} &middot; {{end}}<a href="/history?host={{$node.Label | urlquery}}">History</a>{{end}}
+    </div>
     {{end}}
     {{with $node.Proxmox}}{{if not .Running}}
     <div class="sys-discovery">Proxmox reports this {{.Kind}} as stopped.</div>

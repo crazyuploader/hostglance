@@ -111,8 +111,12 @@ type templateData struct {
 	OldestHours    float64
 	PoolRows       []poolRow // fullest first
 	DiskRows       []diskRow // hottest first
-	HostCaps       []hostCap
-	HostScale      float64 // widest host, so host bars compare in length
+	// Link targets for the status line: first disk to check (a disk-row id)
+	// and first host with a failed required exporter.
+	FirstAttention    string
+	FirstStorageError string
+	HostCaps          []hostCap
+	HostScale         float64 // widest host, so host bars compare in length
 	// Soonest pool to fill at its 7-day growth rate. HasForecast is false
 	// until history has a day of data and some pool is growing.
 	HasForecast bool
@@ -122,14 +126,15 @@ type templateData struct {
 
 // poolRow is one pool in the fill ranking. Frag is a percent.
 type poolRow struct {
-	Name      string // host/pool
-	Pct, Frag float64
-	Health    model.PoolHealth
+	Host, Name string // Name is host/pool
+	Pct, Frag  float64
+	Health     model.PoolHealth
 }
 
 // diskRow is one disk in the temperature list.
 type diskRow struct {
 	Name      string // host/model
+	Ni, Di    int    // host and disk index, as in the disk-row-N-M ids
 	Temp      float64
 	Hours     float64
 	Attention bool
@@ -641,20 +646,26 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 		FetchedAt:  time.Now().Format("15:04:05"),
 		TotalNodes: len(views),
 	}
-	for _, node := range views {
+	for ni, node := range views {
 		if node.Exporters.ZFS.Error != "" || node.Exporters.Smartctl.Error != "" {
 			d.StorageErrors++
+			if d.FirstStorageError == "" {
+				d.FirstStorageError = node.Label
+			}
 		}
 		var disks, fallback, hostTotal, hostUsed float64
-		for _, dk := range node.Disks {
+		for di, dk := range node.Disks {
 			disks += dk.CapacityBytes
 			d.TotalDisks++
 			d.OldestHours = max(d.OldestHours, dk.PowerOnHours)
 			attn := diskNeedsAttention(dk)
 			if attn {
 				d.DisksAttention++
+				if d.FirstAttention == "" {
+					d.FirstAttention = fmt.Sprintf("disk-row-%d-%d", ni, di)
+				}
 			}
-			d.DiskRows = append(d.DiskRows, diskRow{node.Label + "/" + cmp.Or(dk.ModelName, maskSerial(dk.Device)), dk.Temperature, dk.PowerOnHours, attn})
+			d.DiskRows = append(d.DiskRows, diskRow{node.Label + "/" + cmp.Or(dk.ModelName, maskSerial(dk.Device)), ni, di, dk.Temperature, dk.PowerOnHours, attn})
 		}
 		for _, st := range node.PVEStorages {
 			d.UsableTotal += st.Total
@@ -665,7 +676,7 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 		}
 		for _, pool := range node.Pools {
 			d.TotalPools++
-			d.PoolRows = append(d.PoolRows, poolRow{node.Label + "/" + pool.Name, pool.UsedPercent, pool.FragmentationRatio * 100, pool.Health})
+			d.PoolRows = append(d.PoolRows, poolRow{node.Label, node.Label + "/" + pool.Name, pool.UsedPercent, pool.FragmentationRatio * 100, pool.Health})
 			total, used := poolUsable(pool)
 			d.UsableTotal += total
 			d.UsableUsed += used

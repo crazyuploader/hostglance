@@ -633,6 +633,13 @@
   align-items: center; gap: 1px var(--space-3); font-size: var(--text-xs);
 }
 @media (max-width: 520px) { .row { grid-template-columns: minmax(0, 7.5rem) 1fr 2.5rem; } }
+.xlink { color: inherit; text-decoration: none; }
+.xlink:hover { text-decoration: underline; text-decoration-color: var(--border-hi); text-underline-offset: 3px; color: var(--primary); }
+.xlink:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+.panel-title a.xlink { font-size: var(--text-xs); font-weight: 400; color: var(--text-muted); font-family: var(--font-mono); text-decoration: underline; text-decoration-color: var(--border-hi); text-underline-offset: 3px; margin-left: var(--space-2); }
+.panel-title .pt { font-family: inherit; color: inherit; font-size: inherit; font-weight: inherit; }
+.status a { color: inherit; text-decoration: underline; text-decoration-color: var(--border-hi); text-underline-offset: 3px; }
+.status a:hover { text-decoration-color: currentColor; }
 .row-name { font-family: var(--font-mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
 .row-note { grid-column: 2 / -1; color: var(--text-faint); font-family: var(--font-mono); }
@@ -703,9 +710,9 @@
   {{if not .Nodes}}<div class="empty"><h3>No storage exporters detected</h3><p>A host shows here when it reports ZFS or SMART metrics.</p></div>{{end}}
 
   <ul class="status animate-in animate-in-delayed-1" aria-label="Fleet status">
-    <li class="{{if eq .HealthyPools .TotalPools}}ok{{else if .ErroredPools}}bad{{else}}warn{{end}}"><i></i>{{.HealthyPools}} of {{plural .TotalPools "pool"}} online</li>
-    {{if gt .TotalDisks 0}}<li class="{{if .DisksAttention}}bad{{else}}ok{{end}}"><i></i>{{if .DisksAttention}}{{plural .DisksAttention "disk"}} to check{{else}}All {{.TotalDisks}} disks healthy{{end}}</li>{{end}}
-    <li class="{{if .StorageErrors}}bad{{else}}ok{{end}}"><i></i>{{if .StorageErrors}}{{plural .StorageErrors "exporter error"}}{{else}}No exporter errors{{end}}</li>
+    <li class="{{if eq .HealthyPools .TotalPools}}ok{{else if .ErroredPools}}bad{{else}}warn{{end}}"><i></i><a href="#{{if .ErroredPools}}section-faulted{{else if .DegradedPools}}section-degraded{{else}}pools-h{{end}}">{{.HealthyPools}} of {{plural .TotalPools "pool"}} online</a></li>
+    {{if gt .TotalDisks 0}}<li class="{{if .DisksAttention}}bad{{else}}ok{{end}}"><i></i>{{if .DisksAttention}}<a href="#{{.FirstAttention}}">{{plural .DisksAttention "disk"}} to check</a>{{else}}<a href="#disks-h">All {{.TotalDisks}} disks healthy</a>{{end}}</li>{{end}}
+    <li class="{{if .StorageErrors}}bad{{else}}ok{{end}}"><i></i>{{if .StorageErrors}}<a href="#storage-host-{{.FirstStorageError | urlquery}}">{{plural .StorageErrors "exporter error"}}</a>{{else}}No exporter errors{{end}}</li>
   </ul>
 
   {{if or (gt .CapScale 0.0) .PoolRows .DiskRows}}
@@ -740,7 +747,7 @@
       <div class="cap-hosts">
         {{range .HostCaps}}
         <div class="cap-host">
-          <span class="cap-host-name" title="{{.Label}}">{{.Label}}</span>
+          <a class="cap-host-name xlink" href="#storage-host-{{.Label | urlquery}}" title="{{.Label}}">{{.Label}}</a>
           <div class="cap-bar thin">
             <span class="cap-seg used" style="width:{{printf "%.2f" (mul100 (percent .Used $scale))}}%"></span>
             <span class="cap-seg free" style="width:{{printf "%.2f" (mul100 (percent .Free $scale))}}%"></span>
@@ -752,7 +759,7 @@
       </div>
       {{end}}
       {{if .HistoryEnabled}}
-      <p class="cap-forecast">
+      <p class="cap-forecast">{{if .HistoryEnabled}}<a class="xlink" href="/history?view=pools" style="float:right">Pool history</a>{{end}}
         {{if .HasForecast}}<strong class="{{if lt .FullInDays 30.0}}bad{{else if lt .FullInDays 90.0}}warn{{end}}">{{if lt .FullInDays 1.0}}Under a day{{else if lt .FullInDays 365.0}}{{printf "%.0f" .FullInDays}} days{{else}}{{printf "%.1f" (div .FullInDays 365.0)}} years{{end}}</strong> until {{.FullInPool}} fills, at the 7-day growth rate.
         {{else}}No fill forecast yet. It needs a day of history and a growing pool.{{end}}
       </p>
@@ -762,11 +769,11 @@
 
       {{if .PoolRows}}
       <section class="panel" aria-labelledby="pools-h">
-        <h2 class="panel-title" id="pools-h">Pool fill</h2>
+        <h2 class="panel-title" id="pools-h">Pool fill{{if .HistoryEnabled}} <a class="xlink" href="/history?view=pools">history</a>{{end}}</h2>
         <ul class="rows">
           {{range .PoolRows}}
           <li class="row">
-            <span class="row-name" title="{{.Name}}">{{.Name}}</span>
+            <a class="row-name xlink" href="#storage-host-{{.Host | urlquery}}" title="{{.Name}}">{{.Name}}</a>
             <span class="meter" role="img" aria-label="{{printf "%.0f%%" .Pct}} full"><b class="{{pctClass .Pct}}" style="width:{{printf "%.1f" .Pct}}%"></b></span>
             <span class="row-val {{pctClass .Pct}}">{{printf "%.0f%%" .Pct}}</span>
             <span class="row-note">{{if ne (printf "%s" .Health) "ONLINE"}}<em class="bad">{{.Health}}</em> &middot; {{end}}{{printf "%.0f%%" .Frag}} fragmented</span>
@@ -780,11 +787,11 @@
     <div class="col">
       {{if .DiskRows}}
       <section class="panel" aria-labelledby="disks-h">
-        <h2 class="panel-title" id="disks-h">Disk temperature <span>oldest {{fmtHours .OldestHours}}</span></h2>
+        <h2 class="panel-title" id="disks-h"><span class="pt">Disk temperature{{if .HistoryEnabled}} <a class="xlink" href="/history?view=temps">history</a>{{end}}</span> <span>oldest {{fmtHours .OldestHours}}</span></h2>
         <ul class="rows">
           {{range .DiskRows}}
           <li class="row">
-            <span class="row-name {{if .Attention}}bad{{end}}" title="{{.Name}}">{{.Name}}</span>
+            <a class="row-name xlink {{if .Attention}}bad{{end}}" href="#disk-row-{{.Ni}}-{{.Di}}" title="{{.Name}}">{{.Name}}</a>
             <span class="meter thermo" role="img" aria-label="{{printf "%.0f" .Temp}} degrees">{{if gt0 .Temp}}<b class="{{tempClass .Temp}}" style="width:{{tempBarPct .Temp 70.0}}%"></b>{{end}}</span>
             <span class="row-val {{if gt0 .Temp}}{{tempClass .Temp}}{{end}}">{{if gt0 .Temp}}{{printf "%.0f" .Temp}}&deg;{{else}}&ndash;{{end}}</span>
             <span class="row-note">{{fmtHours .Hours}} powered on{{if .Attention}} &middot; <em class="bad">needs attention</em>{{end}}</span>
@@ -872,7 +879,7 @@
 
   <!-- ══ Per-node pools ══ -->
   {{range $ni, $node := .Nodes}}
-  <section class="node {{if or $node.Exporters.ZFS.Error $node.Exporters.Smartctl.Error}}node--error{{end}} animate-in {{if eq $ni 0}}animate-in-delayed-3{{else if eq $ni 1}}animate-in-delayed-4{{else if eq $ni 2}}animate-in-delayed-5{{else}}animate-in-delayed-6{{end}}" aria-label="Host {{$node.Label}}">
+  <section id="storage-host-{{$node.Label | urlquery}}" class="node {{if or $node.Exporters.ZFS.Error $node.Exporters.Smartctl.Error}}node--error{{end}} animate-in {{if eq $ni 0}}animate-in-delayed-3{{else if eq $ni 1}}animate-in-delayed-4{{else if eq $ni 2}}animate-in-delayed-5{{else}}animate-in-delayed-6{{end}}" aria-label="Host {{$node.Label}}">
 
     <div class="node-head">
       <div class="node-icon-wrap" aria-hidden="true">
@@ -881,7 +888,7 @@
       <div class="node-meta">
         <div class="node-label-row">
           {{$title := hostTitle $node.Label $node.System}}
-          <div class="node-label">{{$title}}</div>
+          <div class="node-label"><a class="xlink" href="/#host-{{$node.Label | urlquery}}" title="System details for {{$node.Label}}">{{$title}}</a></div>
           {{if ne $title $node.Label}}<div class="node-location">{{$node.Label}}</div>{{end}}
           {{if $node.Location}}<div class="node-location">{{$node.Location}}</div>{{end}}
         </div>
@@ -1245,6 +1252,33 @@
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(row); }
     });
   });
+
+  /* ── Link targets: open what is collapsed, scroll to it, flash it ──
+     Runs for links followed on this page and for arrivals from other pages.
+     It skips the automatic reload (saved UI state, no-anim), so a refresh
+     does not pull you back to the target. */
+  function openTarget() {
+    let id = '';
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch (_) { return; }
+    const el = id && document.getElementById(id);
+    if (!el) return;
+    const row = id.match(/^disk-row-(\d+)-\d+$/);
+    if (row) {
+      const list = document.getElementById('disk-toggle-' + row[1]);
+      if (list && list.getAttribute('aria-expanded') !== 'true') setOpen(list, true);
+      if (el.getAttribute('aria-expanded') !== 'true') setOpen(el, true);
+    } else if (id === 'section-degraded' || id === 'section-faulted') {
+      const t = document.getElementById('toggle-' + id.slice('section-'.length));
+      if (t && t.getAttribute('aria-expanded') !== 'true') setOpen(t, true);
+    }
+    el.scrollIntoView({ block: row ? 'center' : 'start', behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    if (row) {
+      el.classList.add('flash');
+      setTimeout(function () { el.classList.remove('flash'); }, 1900);
+    }
+  }
+  window.addEventListener('hashchange', openTarget);
+  if (!document.documentElement.classList.contains('no-anim')) openTarget();
 
   /* ── Pool detail modal with focus trap ── */
   const overlay    = document.getElementById('pool-detail-overlay');

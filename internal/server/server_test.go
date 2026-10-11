@@ -629,7 +629,7 @@ func TestSystemPageShowsProxmoxStoppedGuest(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	html := out.String()
-	for _, want := range []string{"Proxmox reports this VM as stopped.", "VM 502 on pve", `href="#host-vm"`, `id="host-vm"`} {
+	for _, want := range []string{"Proxmox reports this VM as stopped.", `VM 502 on <a href="#host-pve">pve</a>`, `href="#host-vm"`, `id="host-vm"`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("page is missing %q", want)
 		}
@@ -748,9 +748,12 @@ func TestMaxTempAndReporting(t *testing.T) {
 	if maxTemp(sys) != 61 || maxTemp(nil) != 0 {
 		t.Fatal("maxTemp")
 	}
-	d := buildSystemPageData([]systemView{{System: sys}, {}})
+	d := buildSystemPageData([]systemView{{Label: "a", System: sys}, {Label: "b"}})
 	if d.Reporting != 1 || d.TotalNodes != 2 {
 		t.Fatalf("reporting %d of %d", d.Reporting, d.TotalNodes)
+	}
+	if d.FirstSilent != "b" || d.HottestHost != "a" || d.FirstError != "" {
+		t.Fatalf("link targets: %q %q %q", d.FirstSilent, d.HottestHost, d.FirstError)
 	}
 }
 

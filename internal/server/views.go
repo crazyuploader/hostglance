@@ -84,12 +84,15 @@ type systemPageData struct {
 	GuestNodes     int // hosts with a parent; excluded from resource totals
 	ExporterErrors int
 	Reporting      int // hosts with system metrics
-	TotalCores     int
-	AvgCPUPct      float64
-	HasCPU         bool
-	MemUsedBytes   float64
-	MemTotal       float64
-	MaxTempC       float64
+	// Link targets for the status line and gauges: labels of the first host
+	// that is silent, the first with a failed exporter, and the hottest one.
+	FirstSilent, FirstError, HottestHost string
+	TotalCores                           int
+	AvgCPUPct                            float64
+	HasCPU                               bool
+	MemUsedBytes                         float64
+	MemTotal                             float64
+	MaxTempC                             float64
 }
 
 // buildSystemPageData aggregates fleet KPIs over the system views.
@@ -104,16 +107,22 @@ func buildSystemPageData(views []systemView) systemPageData {
 	for _, v := range views {
 		if v.Exporters.HasErrors() {
 			d.ExporterErrors++
+			if d.FirstError == "" {
+				d.FirstError = v.Label
+			}
 		}
 		if v.Parent != "" {
 			d.GuestNodes++
 		}
 		if v.System == nil {
+			if d.FirstSilent == "" {
+				d.FirstSilent = v.Label
+			}
 			continue
 		}
 		d.Reporting++
-		for _, t := range v.System.Temps {
-			d.MaxTempC = max(d.MaxTempC, t.Celsius)
+		if t := maxTemp(v.System); t > d.MaxTempC {
+			d.MaxTempC, d.HottestHost = t, v.Label
 		}
 		if v.Parent != "" {
 			continue // the parent already counts the guest's cores and memory

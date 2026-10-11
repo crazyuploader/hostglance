@@ -140,7 +140,9 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .stats th:first-child, .stats td:first-child { text-align:left; }
 .stats td:first-child { color:var(--text); max-width:0; width:100%; }
 .stats .nm { display:flex; align-items:center; gap:var(--space-2); min-width:0; }
-.stats .nm span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stats .nm .xlink { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:inherit; text-decoration:none; }
+.stats .nm .xlink:hover { text-decoration:underline; text-decoration-color:var(--border-hi); text-underline-offset:3px; color:var(--primary); }
+.stats .nm .xlink:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:3px; }
 .stats td.now { color:var(--text); font-weight:600; }
 .swatch { width:12px; height:3px; border-radius:2px; flex:none; }
 .stats th, .stats td { padding-left:var(--space-4); }
@@ -347,6 +349,7 @@ body { display: flex; flex-direction: column; height: 100dvh; }
       allSeries = await res.json();
       buildTree();
       buildPresets();
+      applyQuery();
       if (!selected.size) {
         const first = presets[0];
         if (first) applyPreset(first); else renderPanels();
@@ -547,6 +550,32 @@ body { display: flex; flex-direction: column; height: 100dvh; }
     selected.clear(); buildTree(); syncPresets(); refresh();
   });
 
+  /* ── Deep links from other pages ──
+     ?view=pools|cpu|mem|temps|wear  picks a quick view,
+     ?host=NAME                      shows that host's CPU, memory and load,
+     ?range=HOURS                    sets the time range (when that pill exists). */
+  const HOST_METRICS = ['cpu_pct', 'mem_used_pct', 'load1'];
+  function applyQuery() {
+    const q = new URLSearchParams(location.search);
+    const pill = [...document.querySelectorAll('.range-pill')].find(p => p.dataset.hours === q.get('range'));
+    if (pill) {
+      document.querySelectorAll('.range-pill').forEach(p => p.classList.toggle('active', p === pill));
+      rangeHours = parseInt(pill.dataset.hours, 10);
+    }
+    const preset = presets.find(p => p.id === q.get('view'));
+    const host = q.get('host');
+    if (preset) selected = new Set(preset.keys);
+    else if (host) selected = new Set(allSeries.filter(s => s.node === host && s.kind === 'system' && HOST_METRICS.includes(s.metric)).map(s => s.key));
+    else return;
+    buildTree();
+    syncPresets();
+  }
+  // Where a series' details live, for the link on its name.
+  function detailHref(info) {
+    const n = encodeURIComponent(info.node);
+    return info.kind === 'pool' || info.kind === 'disk' ? '/storage#storage-host-' + n : '/#host-' + n;
+  }
+
   /* ── Fetch ── */
   async function refresh() {
     syncPresets();
@@ -656,7 +685,7 @@ body { display: flex; flex-direction: column; height: 100dvh; }
       const vs = s.points.map(p => p.v);
       const avg = vs.reduce((a, b) => a + b, 0) / vs.length;
       rows += '<tr><td><span class="nm"><span class="swatch" style="background:' + (colorMap[s.key] || COLORS[0]) + '"></span>' +
-        '<span title="' + esc(seriesLabel(s.info)) + '">' + esc(seriesLabel(s.info)) + '</span></span></td>' +
+        '<a class="xlink" href="' + esc(detailHref(s.info)) + '" title="Open details for ' + esc(s.info.node) + '">' + esc(seriesLabel(s.info)) + '</a></span></td>' +
         '<td class="now">' + esc(fmtVal(vs[vs.length - 1], metric)) + '</td>' +
         '<td class="opt">' + esc(fmtVal(Math.min(...vs), metric)) + '</td>' +
         '<td class="opt">' + esc(fmtVal(avg, metric)) + '</td>' +

@@ -322,6 +322,12 @@ button:focus-visible,
   outline: 2px solid var(--primary); outline-offset: 2px;
 }
 
+/* Link targets: clear the sticky top bar, and flash so the eye lands on them. */
+[id] { scroll-margin-top: 4.5rem; }
+@keyframes target-flash { from { background: var(--primary-dim); } to { background: transparent; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sys-card:target, .node:target, .panel:target, .disk-row.flash { animation: target-flash 1.8s ease-out; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
