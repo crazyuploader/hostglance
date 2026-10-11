@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/crazyuploader/hostglance/internal/config"
+	"github.com/crazyuploader/hostglance/internal/history"
 	"github.com/crazyuploader/hostglance/internal/model"
 	"github.com/crazyuploader/hostglance/templates"
 	"github.com/gofiber/fiber/v3"
@@ -679,5 +680,64 @@ func TestBuildTemplateDataRaw(t *testing.T) {
 	}})
 	if d.RawTotal != 60 {
 		t.Fatalf("raw: got %v", d.RawTotal)
+	}
+}
+
+func TestDiskNeedsAttention(t *testing.T) {
+	t.Parallel()
+	ok := model.DiskInfo{SmartPassed: true, Temperature: 40, PercentageUsed: 10}
+	if diskNeedsAttention(ok) {
+		t.Fatal("healthy disk flagged")
+	}
+	for name, d := range map[string]model.DiskInfo{
+		"smart": {Temperature: 40}, "hot": {SmartPassed: true, Temperature: 56},
+		"wear": {SmartPassed: true, PercentageUsed: 80}, "pending": {SmartPassed: true, PendingSectors: 1},
+	} {
+		if !diskNeedsAttention(d) {
+			t.Fatalf("%s not flagged", name)
+		}
+	}
+}
+
+func TestBuildTemplateDataHostCaps(t *testing.T) {
+	t.Parallel()
+	zfs := model.ExporterStatuses{ZFS: model.ExporterStatus{Available: true}}
+	d := buildTemplateData([]model.NodeData{
+		{Label: "a", Exporters: zfs, Pools: []model.Pool{{Name: "p", Size: 100, Allocated: 20}}},
+		{Label: "b", Exporters: zfs, Pools: []model.Pool{{Name: "q", Size: 40, Allocated: 10}}},
+	})
+	if len(d.HostCaps) != 2 || d.HostScale != 100 || d.HostCaps[0].Used != 20 || d.HostCaps[0].Free != 80 {
+		t.Fatalf("got %+v scale %v", d.HostCaps, d.HostScale)
+	}
+}
+
+func TestDaysToFull(t *testing.T) {
+	t.Parallel()
+	day := int64(24 * 3600)
+	grow := []history.Point{{Ts: 0, Value: 0}, {Ts: day, Value: 10}, {Ts: 2 * day, Value: 20}}
+	if days, ok := daysToFull(grow, 50); !ok || days < 4.99 || days > 5.01 {
+		t.Fatalf("growing: %v %v", days, ok)
+	}
+	flat := []history.Point{{Ts: 0, Value: 5}, {Ts: day, Value: 5}, {Ts: 2 * day, Value: 5}}
+	if _, ok := daysToFull(flat, 50); ok {
+		t.Fatal("flat pool forecast")
+	}
+	if _, ok := daysToFull(grow[:2], 50); ok {
+		t.Fatal("too few points forecast")
+	}
+}
+
+func TestBuildTemplateDataRows(t *testing.T) {
+	t.Parallel()
+	d := buildTemplateData([]model.NodeData{{
+		Label: "a", Exporters: model.ExporterStatuses{ZFS: model.ExporterStatus{Available: true}},
+		Pools: []model.Pool{{Name: "x", UsedPercent: 40}, {Name: "y", UsedPercent: 81, FragmentationRatio: 0.6}},
+		Disks: []model.DiskInfo{{ModelName: "cool", Temperature: 30, SmartPassed: true}, {ModelName: "hot", Temperature: 60, SmartPassed: true}},
+	}})
+	if d.PoolRows[0].Name != "a/y" || d.PoolRows[0].Frag != 60 {
+		t.Fatalf("pool rows: %+v", d.PoolRows)
+	}
+	if d.DiskRows[0].Name != "a/hot" || !d.DiskRows[0].Attention || d.DiskRows[1].Attention {
+		t.Fatalf("disk rows: %+v", d.DiskRows)
 	}
 }

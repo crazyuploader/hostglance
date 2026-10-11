@@ -4,6 +4,7 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -104,7 +105,40 @@ type templateData struct {
 	// RawTotal is physical disk capacity. A host without SMART data counts pool size instead.
 	RawTotal float64
 	// CapScale is the bar width basis: raw, or usable if that is larger.
-	CapScale float64
+	CapScale       float64
+	TotalDisks     int
+	DisksAttention int
+	OldestHours    float64
+	PoolRows       []poolRow // fullest first
+	DiskRows       []diskRow // hottest first
+	HostCaps       []hostCap
+	HostScale      float64 // widest host, so host bars compare in length
+	// Soonest pool to fill at its 7-day growth rate. HasForecast is false
+	// until history has a day of data and some pool is growing.
+	HasForecast bool
+	FullInDays  float64
+	FullInPool  string
+}
+
+// poolRow is one pool in the fill ranking. Frag is a percent.
+type poolRow struct {
+	Name      string // host/pool
+	Pct, Frag float64
+	Health    model.PoolHealth
+}
+
+// diskRow is one disk in the temperature list.
+type diskRow struct {
+	Name      string // host/model
+	Temp      float64
+	Hours     float64
+	Attention bool
+}
+
+// hostCap is one host's capacity split, in bytes: used, free, parity and unused.
+type hostCap struct {
+	Label            string
+	Used, Free, Over float64
 }
 
 // historyData is the data passed to the history page template.
@@ -415,6 +449,9 @@ func registerDashboardRoute(app *fiber.App, f *fetcher.Fetcher, tmpl *template.T
 		data.pageData = newPageData(
 			"storage", curCfg, histStore != nil, nodes,
 		)
+		if histStore != nil {
+			addForecast(&data, histStore)
+		}
 
 		setCacheHeaders(c, f, isCached)
 		c.Set("Cache-Control", "no-store")
@@ -608,20 +645,32 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 		if node.Exporters.ZFS.Error != "" || node.Exporters.Smartctl.Error != "" {
 			d.StorageErrors++
 		}
-		var disks, fallback float64
+		var disks, fallback, hostTotal, hostUsed float64
 		for _, dk := range node.Disks {
 			disks += dk.CapacityBytes
+			d.TotalDisks++
+			d.OldestHours = max(d.OldestHours, dk.PowerOnHours)
+			attn := diskNeedsAttention(dk)
+			if attn {
+				d.DisksAttention++
+			}
+			d.DiskRows = append(d.DiskRows, diskRow{node.Label + "/" + cmp.Or(dk.ModelName, dk.Device), dk.Temperature, dk.PowerOnHours, attn})
 		}
 		for _, st := range node.PVEStorages {
 			d.UsableTotal += st.Total
 			d.UsableUsed += st.Used
+			hostTotal += st.Total
+			hostUsed += st.Used
 			fallback += st.Total
 		}
 		for _, pool := range node.Pools {
 			d.TotalPools++
+			d.PoolRows = append(d.PoolRows, poolRow{node.Label + "/" + pool.Name, pool.UsedPercent, pool.FragmentationRatio * 100, pool.Health})
 			total, used := poolUsable(pool)
 			d.UsableTotal += total
 			d.UsableUsed += used
+			hostTotal += total
+			hostUsed += used
 			fallback += pool.Size
 			switch pool.Health {
 			case model.HealthOnline:
@@ -632,14 +681,63 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 				d.ErroredPools++
 			}
 		}
+		raw := fallback
 		if disks > 0 {
-			d.RawTotal += disks
-		} else {
-			d.RawTotal += fallback
+			raw = disks
+		}
+		d.RawTotal += raw
+		if scale := max(raw, hostTotal); scale > 0 {
+			d.HostCaps = append(d.HostCaps, hostCap{node.Label, hostUsed, hostTotal - hostUsed, scale - hostTotal})
+			d.HostScale = max(d.HostScale, scale)
 		}
 	}
 	d.CapScale = max(d.RawTotal, d.UsableTotal)
+	slices.SortFunc(d.PoolRows, func(a, b poolRow) int { return cmp.Compare(b.Pct, a.Pct) })
+	slices.SortFunc(d.DiskRows, func(a, b diskRow) int { return cmp.Compare(b.Temp, a.Temp) })
 	return d
+}
+
+// addForecast finds the pool that fills first, from a linear fit of its
+// allocated bytes over the last 7 days.
+func addForecast(d *templateData, store *history.Store) {
+	now := time.Now()
+	for _, n := range d.Nodes {
+		for _, p := range n.Pools {
+			pts, err := store.Query(history.SeriesKey(n.Label, "pool", p.Name, "alloc_bytes"), now.Add(-7*24*time.Hour), now, 3600)
+			if err != nil {
+				continue
+			}
+			days, ok := daysToFull(pts, p.Free/(1<<20)) // history stores MiB
+			if ok && (!d.HasForecast || days < d.FullInDays) {
+				d.HasForecast, d.FullInDays, d.FullInPool = true, days, n.Label+"/"+p.Name
+			}
+		}
+	}
+}
+
+// daysToFull fits a line to allocated-bytes points and returns the days until
+// free space runs out; points and free must share a unit. It needs 3+ points over 24h+ and a growing pool.
+// shortcut: straight-line fit, so bursty growth skews it; upgrade if forecasts look off.
+func daysToFull(pts []history.Point, free float64) (float64, bool) {
+	n := float64(len(pts))
+	if len(pts) < 3 || pts[len(pts)-1].Ts-pts[0].Ts < 24*3600 {
+		return 0, false
+	}
+	var sx, sy, sxy, sxx float64
+	for _, p := range pts {
+		x := float64(p.Ts - pts[0].Ts)
+		sx, sy, sxy, sxx = sx+x, sy+p.Value, sxy+x*p.Value, sxx+x*x
+	}
+	den := n*sxx - sx*sx
+	if den == 0 {
+		return 0, false
+	}
+	slope := (n*sxy - sx*sy) / den // bytes per second
+	if slope <= 0 {
+		return 0, false
+	}
+	days := free / slope / 86400
+	return days, days < 3650
 }
 
 // poolUsable returns usable bytes and used bytes. The root dataset counts
@@ -878,6 +976,7 @@ func funcMap() template.FuncMap {
 		"mul512":         func(f float64) float64 { return f * 512 },
 		"add":            func(a, b float64) float64 { return a + b },
 		"sub":            func(a, b float64) float64 { return a - b },
+		"div":            func(a, b float64) float64 { return a / b },
 		"percent": func(part, total float64) float64 {
 			if total <= 0 {
 				return 0
@@ -1000,6 +1099,12 @@ func diskHasIssues(d model.DiskInfo) bool {
 	return d.PendingSectors > 0 || d.OfflineUncorrectable > 0 || d.ReportedUncorrect > 0 ||
 		d.ProgramFailCount > 0 || d.EraseFailCount > 0 ||
 		(d.HasExitStatus && d.ExitStatus > 0)
+}
+
+// diskNeedsAttention flags a failed SMART check, error counters, heat (the page's "hot", above 55°C),
+// or SSD/NVMe wear of 80% or more.
+func diskNeedsAttention(d model.DiskInfo) bool {
+	return !d.SmartPassed || diskHasIssues(d) || tempClass(d.Temperature) == "hot" || d.PercentageUsed >= 80
 }
 
 func tempBarPct(temp, maxTemp float64) string {

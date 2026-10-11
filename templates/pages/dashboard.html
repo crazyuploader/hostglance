@@ -602,20 +602,71 @@
   outline-offset: 3px;
 }
 
-/* ── Capacity card ── */
+/* ── Status line ── */
+.status {
+  list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5);
+  margin: 0 0 var(--space-6); padding: 0; font-size: var(--text-sm);
+}
+.status li { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-muted); }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+.status .ok i   { background: var(--success); box-shadow: 0 0 0 3px var(--success-dim); }
+.status .warn i { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-dim); }
+.status .bad i  { background: var(--error);   box-shadow: 0 0 0 3px var(--error-dim); }
+.status .bad    { color: var(--error); font-weight: 600; }
+
+/* ── Layout: capacity left, ranked panels right ── */
+.dash { display: grid; gap: var(--space-6); grid-template-columns: minmax(0, 1fr); margin-bottom: var(--space-8); }
+@media (min-width: 1000px) {
+  .dash { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: start; }
+}
+.col { display: grid; gap: var(--space-6); align-content: start; min-width: 0; }
+.panel-title {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+  font-size: var(--text-base); font-weight: 600; margin: 0 0 var(--space-3);
+}
+.panel-title span { font-size: var(--text-xs); font-weight: 400; color: var(--text-muted); font-family: var(--font-mono); }
+
+/* ── Ranked rows with scale bars ── */
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.row {
+  display: grid; grid-template-columns: minmax(0, 11rem) 1fr 2.75rem;
+  align-items: center; gap: 1px var(--space-3); font-size: var(--text-xs);
+}
+@media (max-width: 520px) { .row { grid-template-columns: minmax(0, 7.5rem) 1fr 2.5rem; } }
+.row-name { font-family: var(--font-mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
+.row-note { grid-column: 2 / -1; color: var(--text-faint); font-family: var(--font-mono); }
+.row em { font-style: normal; font-weight: 600; }
+.bad  { color: var(--error); }
+.warn { color: var(--warning); }
+.cool { color: var(--success); }
+.meter { position: relative; height: 8px; border-radius: var(--radius-full); background: var(--surface-3); overflow: hidden; }
+.meter b { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--primary); transition: width 0.6s ease; }
+.meter b.warn, .meter b.warm { background: var(--warning); }
+.meter b.bad,  .meter b.hot  { background: var(--error); }
+.meter b.cool { background: var(--success); }
+/* thermometer: ticks at 45 and 55 degrees on a 0-70 scale, drawn over the fill */
+.thermo::after { content: ""; position: absolute; inset: 0; background:
+  linear-gradient(var(--text-faint), var(--text-faint)) 64.3% 0 / 1px 100% no-repeat,
+  linear-gradient(var(--text-faint), var(--text-faint)) 78.6% 0 / 1px 100% no-repeat; opacity: 0.7; }
+.row-val.cool { color: var(--success); }
+.row-val.warm { color: var(--warning); }
+.row-val.hot  { color: var(--error); }
+
+/* ── Capacity ── */
 .cap {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-4);
-  margin: calc(-1 * var(--space-3)) 0 var(--space-6);
+  border-radius: var(--radius-lg); padding: var(--space-5);
 }
+.cap-label { font-size: var(--text-xs); color: var(--text-muted); }
 .cap-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.cap-big { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+.cap-big { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .cap-raw { text-align: right; }
 .cap-raw .cap-big { color: var(--text-muted); }
 .cap-pct { font-size: var(--text-lg); font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
 .cap-pct span { font-size: var(--text-xs); font-weight: 500; color: var(--text-muted); }
 .cap-bar {
-  display: flex; height: 14px; margin: var(--space-3) 0; overflow: hidden;
+  display: flex; height: 14px; margin: var(--space-4) 0 var(--space-3); overflow: hidden;
   border-radius: var(--radius-full); background: var(--surface-3);
 }
 .cap-seg { height: 100%; transition: width 0.6s ease; }
@@ -627,6 +678,15 @@
 .cap-legend i.used { background: var(--primary); }
 .cap-legend i.free { background: color-mix(in oklab, var(--primary) 28%, transparent); }
 .cap-legend i.over { background: var(--text-faint); }
+.cap-hosts { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border); display: grid; gap: var(--space-2); }
+.cap-host { display: grid; grid-template-columns: minmax(0, 6rem) 1fr auto; align-items: center; gap: var(--space-3); font-size: var(--text-xs); font-family: var(--font-mono); }
+.cap-host-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cap-host-val { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cap-bar.thin { height: 8px; margin: 0; }
+.cap-forecast { margin: var(--space-4) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--text-xs); color: var(--text-muted); }
+.cap-forecast strong { color: var(--success); }
+.cap-forecast strong.warn { color: var(--warning); }
+.cap-forecast strong.bad  { color: var(--error); }
 </style>
 {{end}}
 
@@ -642,62 +702,97 @@
   <!-- KPI summary -->
   {{if not .Nodes}}<div class="empty"><h3>No storage exporters detected</h3><p>A host shows here when it reports ZFS or SMART metrics.</p></div>{{end}}
 
-  <div class="kpi-row animate-in animate-in-delayed-1" role="region" aria-label="Fleet summary">
-    <div class="kpi">
-      <div class="kpi-label">Hosts</div>
-      <div class="kpi-val neutral">{{.TotalNodes}}</div>
-      <div class="kpi-hint">with storage</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Pools</div>
-      <div class="kpi-val neutral">{{.TotalPools}}</div>
-      <div class="kpi-hint">total</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Errors</div>
-      <div class="kpi-val {{if gt .StorageErrors 0}}bad{{else}}neutral{{end}}">{{.StorageErrors}}</div>
-      <div class="kpi-hint">required storage exporters</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Healthy</div>
-      <div class="kpi-val ok">{{.HealthyPools}}</div>
-      <div class="kpi-hint">ONLINE</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Degraded</div>
-      <div class="kpi-val {{if gt .DegradedPools 0}}warn{{else}}neutral{{end}}">{{.DegradedPools}}</div>
-      <div class="kpi-hint">DEGRADED</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Faulted</div>
-      <div class="kpi-val {{if gt .ErroredPools 0}}bad{{else}}neutral{{end}}">{{.ErroredPools}}</div>
-      <div class="kpi-hint">FAULTED/UNAVAIL</div>
-    </div>
-  </div>
+  <ul class="status animate-in animate-in-delayed-1" aria-label="Fleet status">
+    <li class="{{if eq .HealthyPools .TotalPools}}ok{{else if .ErroredPools}}bad{{else}}warn{{end}}"><i></i>{{.HealthyPools}} of {{plural .TotalPools "pool"}} online</li>
+    {{if gt .TotalDisks 0}}<li class="{{if .DisksAttention}}bad{{else}}ok{{end}}"><i></i>{{if .DisksAttention}}{{plural .DisksAttention "disk"}} to check{{else}}All {{.TotalDisks}} disks healthy{{end}}</li>{{end}}
+    <li class="{{if .StorageErrors}}bad{{else}}ok{{end}}"><i></i>{{if .StorageErrors}}{{plural .StorageErrors "exporter error"}}{{else}}No exporter errors{{end}}</li>
+  </ul>
 
-  <!-- Capacity: raw disks split into used / free / parity+unused -->
-  {{if gt .CapScale 0.0}}
-  <div class="cap animate-in animate-in-delayed-1" role="region" aria-label="Fleet capacity">
-    <div class="cap-head">
-      <div>
-        <div class="kpi-label">Usable</div>
-        <div class="cap-big">{{humanBytes .UsableTotal}}</div>
+  {{if or (gt .CapScale 0.0) .PoolRows .DiskRows}}
+  <div class="dash animate-in animate-in-delayed-1">
+    <div class="col">
+
+    {{if gt .CapScale 0.0}}
+    <section class="cap" aria-label="Fleet capacity">
+      <div class="cap-head">
+        <div>
+          <div class="cap-label">Usable</div>
+          <div class="cap-big">{{humanBytes .UsableTotal}}</div>
+        </div>
+        <div class="cap-pct">{{printf "%.0f%%" (mul100 (percent .UsableUsed .UsableTotal))}} <span>full</span></div>
+        <div class="cap-raw">
+          <div class="cap-label">Raw disks</div>
+          <div class="cap-big">{{humanBytes .RawTotal}}</div>
+        </div>
       </div>
-      <div class="cap-pct">{{printf "%.0f%%" (mul100 (percent .UsableUsed .UsableTotal))}} <span>full</span></div>
-      <div class="cap-raw">
-        <div class="kpi-label">Raw</div>
-        <div class="cap-big">{{humanBytes .RawTotal}}</div>
+      <div class="cap-bar" role="img" aria-label="{{humanBytes .UsableUsed}} used, {{humanBytes (sub .UsableTotal .UsableUsed)}} free of {{humanBytes .UsableTotal}} usable">
+        <span class="cap-seg used" style="width:{{printf "%.2f" (mul100 (percent .UsableUsed .CapScale))}}%"></span>
+        <span class="cap-seg free" style="width:{{printf "%.2f" (mul100 (percent (sub .UsableTotal .UsableUsed) .CapScale))}}%"></span>
+        <span class="cap-seg over" style="width:{{printf "%.2f" (mul100 (percent (sub .CapScale .UsableTotal) .CapScale))}}%"></span>
       </div>
+      <div class="cap-legend">
+        <span><i class="used"></i>Used {{humanBytes .UsableUsed}}</span>
+        <span><i class="free"></i>Free {{humanBytes (sub .UsableTotal .UsableUsed)}}</span>
+        <span><i class="over"></i>Parity &amp; unused {{humanBytes (sub .CapScale .UsableTotal)}}</span>
+      </div>
+      {{if gt (len .HostCaps) 1}}
+      {{$scale := .HostScale}}
+      <div class="cap-hosts">
+        {{range .HostCaps}}
+        <div class="cap-host">
+          <span class="cap-host-name" title="{{.Label}}">{{.Label}}</span>
+          <div class="cap-bar thin">
+            <span class="cap-seg used" style="width:{{printf "%.2f" (mul100 (percent .Used $scale))}}%"></span>
+            <span class="cap-seg free" style="width:{{printf "%.2f" (mul100 (percent .Free $scale))}}%"></span>
+            <span class="cap-seg over" style="width:{{printf "%.2f" (mul100 (percent .Over $scale))}}%"></span>
+          </div>
+          <span class="cap-host-val">{{humanBytes .Used}} / {{humanBytes (add .Used .Free)}}</span>
+        </div>
+        {{end}}
+      </div>
+      {{end}}
+      {{if .HistoryEnabled}}
+      <p class="cap-forecast">
+        {{if .HasForecast}}<strong class="{{if lt .FullInDays 30.0}}bad{{else if lt .FullInDays 90.0}}warn{{end}}">{{if lt .FullInDays 1.0}}Under a day{{else if lt .FullInDays 365.0}}{{printf "%.0f" .FullInDays}} days{{else}}{{printf "%.1f" (div .FullInDays 365.0)}} years{{end}}</strong> until {{.FullInPool}} fills, at the 7-day growth rate.
+        {{else}}No fill forecast yet. It needs a day of history and a growing pool.{{end}}
+      </p>
+      {{end}}
+    </section>
+    {{end}}
+
+      {{if .PoolRows}}
+      <section class="panel" aria-labelledby="pools-h">
+        <h2 class="panel-title" id="pools-h">Pool fill</h2>
+        <ul class="rows">
+          {{range .PoolRows}}
+          <li class="row">
+            <span class="row-name" title="{{.Name}}">{{.Name}}</span>
+            <span class="meter" role="img" aria-label="{{printf "%.0f%%" .Pct}} full"><b class="{{pctClass .Pct}}" style="width:{{printf "%.1f" .Pct}}%"></b></span>
+            <span class="row-val {{pctClass .Pct}}">{{printf "%.0f%%" .Pct}}</span>
+            <span class="row-note">{{if ne (printf "%s" .Health) "ONLINE"}}<em class="bad">{{.Health}}</em> &middot; {{end}}{{printf "%.0f%%" .Frag}} fragmented</span>
+          </li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
     </div>
-    <div class="cap-bar" role="img" aria-label="{{humanBytes .UsableUsed}} used, {{humanBytes (sub .UsableTotal .UsableUsed)}} free of {{humanBytes .UsableTotal}} usable">
-      <span class="cap-seg used" style="width:{{printf "%.2f" (mul100 (percent .UsableUsed .CapScale))}}%"></span>
-      <span class="cap-seg free" style="width:{{printf "%.2f" (mul100 (percent (sub .UsableTotal .UsableUsed) .CapScale))}}%"></span>
-      <span class="cap-seg over" style="width:{{printf "%.2f" (mul100 (percent (sub .CapScale .UsableTotal) .CapScale))}}%"></span>
-    </div>
-    <div class="cap-legend">
-      <span><i class="used"></i>Used {{humanBytes .UsableUsed}}</span>
-      <span><i class="free"></i>Free {{humanBytes (sub .UsableTotal .UsableUsed)}}</span>
-      <span><i class="over"></i>Parity &amp; unused {{humanBytes (sub .CapScale .UsableTotal)}}</span>
+
+    <div class="col">
+      {{if .DiskRows}}
+      <section class="panel" aria-labelledby="disks-h">
+        <h2 class="panel-title" id="disks-h">Disk temperature <span>oldest {{fmtHours .OldestHours}}</span></h2>
+        <ul class="rows">
+          {{range .DiskRows}}
+          <li class="row">
+            <span class="row-name {{if .Attention}}bad{{end}}" title="{{.Name}}">{{.Name}}</span>
+            <span class="meter thermo" role="img" aria-label="{{printf "%.0f" .Temp}} degrees">{{if gt0 .Temp}}<b class="{{tempClass .Temp}}" style="width:{{tempBarPct .Temp 70.0}}%"></b>{{end}}</span>
+            <span class="row-val {{if gt0 .Temp}}{{tempClass .Temp}}{{end}}">{{if gt0 .Temp}}{{printf "%.0f" .Temp}}&deg;{{else}}&ndash;{{end}}</span>
+            <span class="row-note">{{fmtHours .Hours}} powered on{{if .Attention}} &middot; <em class="bad">needs attention</em>{{end}}</span>
+          </li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
     </div>
   </div>
   {{end}}
