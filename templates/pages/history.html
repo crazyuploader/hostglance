@@ -402,7 +402,7 @@ canvas#chart { display:block; width:100%; }
         kg.appendChild(kb);
 
         for (const [diskName, metrics] of Object.entries(disks)) {
-          const shortName = diskName.replace(/^.*\/([^/]+)$/, '$1');
+          const shortName = shownName(kind, diskName.replace(/^.*\/([^/]+)$/, '$1'));
 
           const dg = document.createElement('div');
           dg.className = 'disk-group';
@@ -413,7 +413,7 @@ canvas#chart { display:block; width:100%; }
           const dt = document.createElement('button');
           dt.className = 'disk-toggle';
           dt.type = 'button';
-          dt.title = diskName;
+          dt.title = shownName(kind, diskName);
           dt.innerHTML = chevronSVG +
             '<span class="disk-name">' + esc(shortName) + '</span>';
           dt.addEventListener('click', () => dg.classList.toggle('open'));
@@ -726,10 +726,16 @@ canvas#chart { display:block; width:100%; }
   const RATE_METRICS = { rx_bps: 1, tx_bps: 1 };
 
   /* ── Helpers ── */
+  // Disk device names end in the serial number, so mask the last 5 characters
+  // as the server does for the Storage page.
+  function shownName(kind, name) {
+    if (kind !== 'disk') return name;
+    return name.length > 5 ? name.slice(0, -5) + 'xxxxx' : 'x'.repeat(name.length);
+  }
   // seriesLabel names the host, so series from different hosts stay distinct.
   // System metrics are per host, so their name ("node") adds nothing.
   function seriesLabel(info) {
-    const name = info.name.replace(/^.*\/([^/]+)$/, '$1');
+    const name = shownName(info.kind, info.name.replace(/^.*\/([^/]+)$/, '$1'));
     return info.kind === 'system' ? info.node : info.node + ' ' + name;
   }
   function fmtVal(v, metric) {

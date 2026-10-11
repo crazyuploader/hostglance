@@ -7,30 +7,37 @@
   var html = document.documentElement;
   var themeBtn = document.querySelector('[data-theme-toggle]');
   var themeKey = 'hostglance-theme';
-  var theme;
-  try { theme = localStorage.getItem(themeKey); } catch (_) { theme = null; }
-  if (theme !== 'dark' && theme !== 'light') {
-    theme = window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
-  }
+  var modes = ['system', 'light', 'dark'];
+  var mode;
+  try { mode = localStorage.getItem(themeKey); } catch (_) { mode = null; }
+  if (modes.indexOf(mode) < 0) mode = 'system'; // new users follow the system
+  var dark = window.matchMedia('(prefers-color-scheme:dark)');
 
-  var moonSVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-  var sunSVG  = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+  var icons = {
+    dark:   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    light:  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
+    system: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'
+  };
 
-  function applyTheme(t) {
+  function applyTheme() {
+    var t = mode === 'system' ? (dark.matches ? 'dark' : 'light') : mode;
     html.setAttribute('data-theme', t);
     html.style.colorScheme = t;
     if (themeBtn) {
-      themeBtn.innerHTML = t === 'dark' ? moonSVG : sunSVG;
-      themeBtn.setAttribute('aria-label', 'Switch to ' + (t === 'dark' ? 'light' : 'dark') + ' mode');
+      var next = modes[(modes.indexOf(mode) + 1) % modes.length];
+      themeBtn.innerHTML = icons[mode];
+      themeBtn.setAttribute('aria-label', 'Theme: ' + mode + '. Switch to ' + next + '.');
+      themeBtn.title = 'Theme: ' + mode;
     }
     document.dispatchEvent(new CustomEvent('hostglance:theme', { detail: t }));
   }
-  applyTheme(theme);
+  applyTheme();
+  dark.addEventListener('change', function () { if (mode === 'system') applyTheme(); });
   if (themeBtn) {
     themeBtn.addEventListener('click', function () {
-      theme = theme === 'dark' ? 'light' : 'dark';
-      try { localStorage.setItem(themeKey, theme); } catch (_) {}
-      applyTheme(theme);
+      mode = modes[(modes.indexOf(mode) + 1) % modes.length];
+      try { localStorage.setItem(themeKey, mode); } catch (_) {}
+      applyTheme();
     });
   }
 

@@ -972,7 +972,7 @@
              tabindex="0" role="button" aria-expanded="false"
              aria-controls="disk-detail-{{$ni}}-{{$di}}">
           <span class="disk-model">{{if $disk.ModelName}}{{$disk.ModelName}}{{else}}{{maskSerial $disk.Device}}{{end}}</span>
-          {{if $disk.SerialNumber}}<span class="disk-serial">{{maskSerial $disk.SerialNumber}}</span>{{end}}
+          {{if $disk.SerialNumber}}<span class="disk-serial" title="serial number, shortened">{{shortSerial $disk.SerialNumber}}</span>{{end}}
           {{if gt0 $disk.CapacityBytes}}<span class="disk-cap">{{humanBytes $disk.CapacityBytes}}</span>{{end}}
           <span class="disk-type-badge {{diskTypeClass $disk.Interface $disk.RotationRate}}">{{diskTypeLabel $disk.Interface $disk.RotationRate}}</span>
           {{if gt0 $disk.Temperature}}<span class="disk-temp {{tempClass $disk.Temperature}}">{{printf "%.0f" $disk.Temperature}}&deg;C</span>{{end}}

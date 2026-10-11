@@ -654,7 +654,7 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 			if attn {
 				d.DisksAttention++
 			}
-			d.DiskRows = append(d.DiskRows, diskRow{node.Label + "/" + cmp.Or(dk.ModelName, dk.Device), dk.Temperature, dk.PowerOnHours, attn})
+			d.DiskRows = append(d.DiskRows, diskRow{node.Label + "/" + cmp.Or(dk.ModelName, maskSerial(dk.Device)), dk.Temperature, dk.PowerOnHours, attn})
 		}
 		for _, st := range node.PVEStorages {
 			d.UsableTotal += st.Total
@@ -968,6 +968,7 @@ func funcMap() template.FuncMap {
 		"tempBarPct":     tempBarPct,
 		"fmtHours":       fmtHours,
 		"maskSerial":     maskSerial,
+		"shortSerial":    shortSerial,
 		"diskTypeLabel":  diskTypeLabel,
 		"diskTypeClass":  diskTypeClass,
 		"tempClass":      tempClass,
@@ -1142,6 +1143,16 @@ func maskSerial(s string) string {
 		return strings.Repeat("x", len(s))
 	}
 	return s[:len(s)-maskLen] + strings.Repeat("x", maskLen)
+}
+
+// shortSerial shows at most 6 leading characters and an ellipsis. Like
+// maskSerial, it never reveals the last 5 characters.
+func shortSerial(s string) string {
+	const hidden, shown = 5, 6
+	if len(s) <= hidden {
+		return strings.Repeat("x", len(s))
+	}
+	return s[:min(shown, len(s)-hidden)] + "…"
 }
 
 func diskTypeLabel(iface string, rpm int) string {

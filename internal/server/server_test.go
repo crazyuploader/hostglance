@@ -753,3 +753,16 @@ func TestMaxTempAndReporting(t *testing.T) {
 		t.Fatalf("reporting %d of %d", d.Reporting, d.TotalNodes)
 	}
 }
+
+func TestShortSerial(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[string]string{
+		"ABC":                  "xxx",
+		"S2W7WA7W":             "S2W…",
+		"TPBF2312080030105573": "TPBF23…",
+	} {
+		if got := shortSerial(in); got != want {
+			t.Fatalf("%q: got %q, want %q", in, got, want)
+		}
+	}
+}

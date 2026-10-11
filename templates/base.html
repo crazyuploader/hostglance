@@ -6,6 +6,8 @@
 <meta name="color-scheme" content="dark light">
 <script>
 /* Skip entrance animations when returning to a page (refresh reloads save UI state). */
+/* Set the theme before first paint: saved choice, else the system setting. */
+try { var m = localStorage.getItem('hostglance-theme'); document.documentElement.setAttribute('data-theme', m === 'dark' || m === 'light' ? m : (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light')); } catch (_) {}
 try { if (sessionStorage.getItem('hostglance:ui:' + location.pathname)) document.documentElement.classList.add('no-anim'); } catch (_) {}
 </script>
 <title>{{block "title" .}}HostGlance{{end}}</title>
