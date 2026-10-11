@@ -955,6 +955,7 @@ func funcMap() template.FuncMap {
 		"fmtRate":        fmtRate,
 		"fmtUptime":      fmtUptime,
 		"loadClass":      loadClass,
+		"maxTemp":        maxTemp,
 		"pctClass":       pctClass,
 		"healthClass":    healthClass,
 		"fmtNodeTime":    fmtNodeTime,
@@ -1163,6 +1164,17 @@ func diskTypeClass(iface string, rpm int) string {
 	default:
 		return "ssd"
 	}
+}
+
+// maxTemp returns the hottest sensor of a host, or 0 without sensors.
+func maxTemp(s *model.SystemInfo) float64 {
+	var m float64
+	if s != nil {
+		for _, t := range s.Temps {
+			m = max(m, t.Celsius)
+		}
+	}
+	return m
 }
 
 func tempClass(c float64) string {

@@ -25,16 +25,12 @@
 
 /* ── Node card ── */
 .sys-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-xl); padding: var(--space-4);
-  margin-bottom: var(--space-5);
-  transition: border-color var(--transition);
+  border-top: 1px solid var(--border);
+  padding: var(--space-5) 0 var(--space-6); scroll-margin-top: var(--space-16, 4rem);
 }
-@media (min-width: 480px) { .sys-card { padding: var(--space-5); } }
-.sys-card:hover { border-color: var(--border-hi); }
 /* Guests (VMs/containers) sit indented under their parent host. */
 .sys-card.sys-card-guest {
-  margin-left: var(--space-4);
+  margin-left: var(--space-4); padding-left: var(--space-4);
   border-left: 3px solid color-mix(in oklab, var(--primary) 40%, var(--border));
 }
 @media (min-width: 768px) { .sys-card.sys-card-guest { margin-left: var(--space-8); } }
@@ -79,14 +75,11 @@
 .net-virtual summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 .net-virtual[open] summary { margin-bottom: var(--space-2); }
 .sys-guest-of { color: var(--text-muted); font-size: var(--text-sm); }
-.sys-card.sys-card-error {
-  border-color: color-mix(in oklab, var(--error) 28%, transparent);
-}
+.sys-card.sys-card-error { border-left: 3px solid var(--error); padding-left: var(--space-4); }
 
 .sys-head {
   display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
-  padding-bottom: var(--space-3); margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-4);
 }
 .sys-hostname { font-size: var(--text-base); font-weight: 600; letter-spacing: -0.01em; }
 .sys-location {
@@ -124,19 +117,14 @@
 .sys-grid {
   display: grid; grid-template-columns: 1fr; gap: var(--space-3);
 }
-@media (min-width: 640px)  { .sys-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-4); } }
+@media (min-width: 640px)  { .sys-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-5) var(--space-6); } }
 @media (min-width: 1000px) { .sys-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 
 .sys-block {
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-4);
   display: flex; flex-direction: column; gap: var(--space-3);
   min-width: 0;
 }
-.sys-block-label {
-  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-faint);
-}
+.sys-block-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); }
 
 /* big value + bar */
 .sys-big {
@@ -181,8 +169,76 @@
 .temp-chip.cool b { color: var(--success); }
 .temp-chip.warm b { color: var(--warning); }
 .temp-chip.hot  b { color: var(--error); }
-.sys-storage, .sys-discovery { padding: var(--space-4) var(--space-5); color: var(--text-muted); font-size: var(--text-sm); }
+.sys-storage, .sys-discovery { padding: 0 0 var(--space-4); color: var(--text-muted); font-size: var(--text-sm); }
 .sys-storage a { color: var(--accent); }
+
+/* ── Status line ── */
+.status { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); margin: 0 0 var(--space-5); padding: 0; font-size: var(--text-sm); }
+.status li { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-muted); }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+.status .ok i   { background: var(--success); box-shadow: 0 0 0 3px var(--success-dim); }
+.status .warn i { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-dim); }
+.status .bad i  { background: var(--error);   box-shadow: 0 0 0 3px var(--error-dim); }
+.status .bad    { color: var(--error); font-weight: 600; }
+
+/* ── Meters ── */
+.fmeter { position: relative; display: block; height: 8px; border-radius: var(--radius-full); background: var(--surface-3); overflow: hidden; min-width: 0; }
+.fmeter i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--primary); }
+.fmeter i.warn, .fmeter i.warm { background: var(--warning); }
+.fmeter i.bad,  .fmeter i.hot  { background: var(--error); }
+.fmeter i.cool { background: var(--success); }
+.fmeter.thermo::after { content: ""; position: absolute; inset: 0; opacity: 0.7; background:
+  linear-gradient(var(--text-faint), var(--text-faint)) 50% 0 / 1px 100% no-repeat,
+  linear-gradient(var(--text-faint), var(--text-faint)) 61.1% 0 / 1px 100% no-repeat; }
+.warn, .warm { color: var(--warning); }
+.bad, .hot   { color: var(--error); }
+.cool        { color: var(--success); }
+.dim         { color: var(--text-faint); }
+
+/* ── Fleet gauges ── */
+.gauges { display: grid; grid-template-columns: 1fr; gap: var(--space-5); padding: var(--space-5) 0; border-block: 1px solid var(--border); margin-bottom: var(--space-6); }
+@media (min-width: 760px) { .gauges { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .gauge + .gauge { border-left: 1px solid var(--border); padding-left: var(--space-6); }
+  .gauge:not(:last-child) { padding-right: var(--space-6); } }
+.gauge-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-2); font-size: var(--text-sm); color: var(--text-muted); }
+.gauge-top b { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; color: var(--text); }
+.gauge-top b.warn, .gauge-top b.warm { color: var(--warning); }
+.gauge-top b.bad, .gauge-top b.hot { color: var(--error); }
+.gauge-top b.cool { color: var(--success); }
+.gauge .fmeter { height: 10px; }
+.gauge-sub { margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-faint); font-family: var(--font-mono); }
+
+/* ── Host table ── */
+.panel-title { font-size: var(--text-base); font-weight: 600; margin: 0 0 var(--space-3); }
+.fleet { margin-bottom: var(--space-8); }
+.ft-row {
+  display: grid; align-items: center; column-gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem;
+  padding: var(--space-2) var(--space-2); border-top: 1px solid var(--border);
+  font-size: var(--text-sm); color: var(--text); text-decoration: none;
+}
+.ft-head { border-top: 0; font-size: var(--text-xs); color: var(--text-muted); padding-block: 0 var(--space-1); }
+a.ft-row:hover { background: var(--surface-2); }
+a.ft-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ft-name { display: flex; align-items: center; gap: var(--space-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.ft-row.guest .ft-name { padding-left: var(--space-5); font-weight: 400; color: var(--text-muted); }
+.ft-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); flex: none; }
+.ft-dot.bad { background: var(--error); }
+.ft-dot.dim { background: var(--text-faint); }
+.ft-meter { display: grid; grid-template-columns: 1fr; font-variant-numeric: tabular-nums; font-size: var(--text-xs); font-family: var(--font-mono); text-align: right; }
+.ft-meter .fmeter { display: none; }
+.ft-meter b { font-weight: 600; }
+.ft-load, .ft-temp, .ft-up { display: none; font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; text-align: right; }
+.ft-none { grid-column: 2 / -1; font-size: var(--text-xs); color: var(--text-faint); text-align: right; }
+@media (min-width: 640px) {
+  .ft-row { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) minmax(0, 1fr); }
+  .ft-meter { grid-template-columns: 1fr 2.75rem; align-items: center; column-gap: var(--space-2); }
+  .ft-meter .fmeter { display: block; }
+}
+@media (min-width: 960px) {
+  .ft-row { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) minmax(0, 1fr) 3.5rem 3rem 5.5rem; }
+  .ft-load, .ft-temp, .ft-up { display: block; }
+}
 </style>
 {{end}}
 
@@ -205,39 +261,49 @@
   </div>
   {{else}}
 
-  <!-- Fleet KPIs -->
-  <div class="kpi-row animate-in animate-in-delayed-1" role="region" aria-label="Fleet system summary">
-    <div class="kpi">
-      <div class="kpi-label">Hosts</div>
-      <div class="kpi-val neutral">{{.TotalNodes}}</div>
-      <div class="kpi-hint">{{if .GuestNodes}}incl. {{plural .GuestNodes "guest"}}{{else}}configured{{end}}</div>
+  <ul class="status animate-in animate-in-delayed-1" aria-label="Fleet status">
+    <li class="{{if eq .Reporting .TotalNodes}}ok{{else}}warn{{end}}"><i></i>{{.Reporting}} of {{plural .TotalNodes "host"}} reporting{{if .GuestNodes}}, {{.GuestNodes}} of them guests{{end}}</li>
+    <li class="{{if .ExporterErrors}}bad{{else}}ok{{end}}"><i></i>{{if .ExporterErrors}}{{plural .ExporterErrors "host"}} with a failed required exporter{{else}}No exporter errors{{end}}</li>
+  </ul>
+
+  <div class="gauges animate-in animate-in-delayed-1" role="region" aria-label="Fleet load">
+    <div class="gauge">
+      <div class="gauge-top"><span>CPU, fleet average</span><b class="{{if .HasCPU}}{{pctClass .AvgCPUPct}}{{end}}">{{if .HasCPU}}{{printf "%.0f%%" .AvgCPUPct}}{{else}}n/a{{end}}</b></div>
+      <div class="fmeter"><i class="{{pctClass .AvgCPUPct}}" style="width:{{if .HasCPU}}{{printf "%.1f" .AvgCPUPct}}{{else}}0{{end}}%"></i></div>
+      <div class="gauge-sub">{{plural .TotalCores "core"}}{{if .GuestNodes}}, guests not counted{{end}}</div>
     </div>
-    <div class="kpi">
-      <div class="kpi-label">Cores</div>
-      <div class="kpi-val neutral">{{.TotalCores}}</div>
-      <div class="kpi-hint">{{if .GuestNodes}}excl. guests{{else}}total{{end}}</div>
+    <div class="gauge">
+      <div class="gauge-top"><span>Memory</span><b class="{{if gt .MemTotal 0.0}}{{pctClass (mul100 (percent .MemUsedBytes .MemTotal))}}{{end}}">{{if gt .MemTotal 0.0}}{{printf "%.0f%%" (mul100 (percent .MemUsedBytes .MemTotal))}}{{else}}n/a{{end}}</b></div>
+      <div class="fmeter"><i class="{{pctClass (mul100 (percent .MemUsedBytes .MemTotal))}}" style="width:{{printf "%.1f" (mul100 (percent .MemUsedBytes .MemTotal))}}%"></i></div>
+      <div class="gauge-sub">{{humanBytes .MemUsedBytes}} of {{humanBytes .MemTotal}}</div>
     </div>
-    <div class="kpi">
-      <div class="kpi-label">Avg CPU</div>
-      <div class="kpi-val {{if .HasCPU}}{{if pctClass .AvgCPUPct}}{{pctClass .AvgCPUPct}}{{else}}ok{{end}}{{else}}neutral{{end}}">{{if .HasCPU}}{{printf "%.0f%%" .AvgCPUPct}}{{else}}n/a{{end}}</div>
-      <div class="kpi-hint">busy</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Memory</div>
-      <div class="kpi-val neutral">{{if gt .MemTotal 0.0}}{{printf "%.0f%%" (mul100 (percent .MemUsedBytes .MemTotal))}}{{else}}n/a{{end}}</div>
-      <div class="kpi-hint">{{humanBytes .MemUsedBytes}} / {{humanBytes .MemTotal}}</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Hottest</div>
-      <div class="kpi-val {{if gt .MaxTempC 0.0}}{{if gt .MaxTempC 55.0}}bad{{else if gt .MaxTempC 45.0}}warn{{else}}ok{{end}}{{else}}neutral{{end}}">{{if gt .MaxTempC 0.0}}{{printf "%.0f" .MaxTempC}}&deg;C{{else}}n/a{{end}}</div>
-      <div class="kpi-hint">sensor</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Errors</div>
-      <div class="kpi-val {{if gt .ExporterErrors 0}}bad{{else}}neutral{{end}}">{{.ExporterErrors}}</div>
-      <div class="kpi-hint">hosts with a failed required exporter</div>
+    <div class="gauge">
+      <div class="gauge-top"><span>Hottest sensor</span><b class="{{if gt .MaxTempC 0.0}}{{tempClass .MaxTempC}}{{end}}">{{if gt .MaxTempC 0.0}}{{printf "%.0f" .MaxTempC}}&deg;C{{else}}n/a{{end}}</b></div>
+      <div class="fmeter thermo"><i class="{{tempClass .MaxTempC}}" style="width:{{tempBarPct .MaxTempC 90.0}}%"></i></div>
+      <div class="gauge-sub">amber above 45, red above 55</div>
     </div>
   </div>
+
+  <section class="fleet animate-in animate-in-delayed-2" aria-label="Hosts">
+    <h2 class="panel-title">Hosts</h2>
+    <div class="ft">
+      <div class="ft-row ft-head" aria-hidden="true"><span>Host</span><span>CPU</span><span>Memory</span><span class="ft-load">Load</span><span class="ft-temp">Temp</span><span class="ft-up">Uptime</span></div>
+      {{range .Nodes}}
+      <a class="ft-row{{if .Parent}} guest{{end}}" href="#host-{{.Label | urlquery}}">
+        <span class="ft-name"><i class="ft-dot {{if .Error}}bad{{else if not .System}}dim{{end}}"></i>{{hostTitle .Label .System}}</span>
+        {{with .System}}
+        <span class="ft-meter">{{if .HasCPURates}}<span class="fmeter"><i class="{{pctClass .CPUBusyPct}}" style="width:{{printf "%.1f" .CPUBusyPct}}%"></i></span><b class="{{pctClass .CPUBusyPct}}">{{printf "%.0f%%" .CPUBusyPct}}</b>{{else}}<span class="dim">warming up</span>{{end}}</span>
+        <span class="ft-meter"><span class="fmeter"><i class="{{pctClass .MemUsedPct}}" style="width:{{printf "%.1f" .MemUsedPct}}%"></i></span><b class="{{pctClass .MemUsedPct}}">{{printf "%.0f%%" .MemUsedPct}}</b></span>
+        <span class="ft-load {{loadClass .Load1 .Cores}}">{{printf "%.2f" .Load1}}</span>
+        <span class="ft-temp {{if gt (maxTemp .) 0.0}}{{tempClass (maxTemp .)}}{{end}}">{{if gt (maxTemp .) 0.0}}{{printf "%.0f" (maxTemp .)}}&deg;{{else}}&ndash;{{end}}</span>
+        <span class="ft-up">{{if gt .UptimeSecs 0.0}}{{fmtUptime .UptimeSecs}}{{else}}&ndash;{{end}}</span>
+        {{else}}
+        <span class="ft-none {{if .Error}}bad{{end}}">{{if .Error}}required exporter failed{{else if .FetchedAt.IsZero}}looking for exporters{{else}}no system metrics{{end}}</span>
+        {{end}}
+      </a>
+      {{end}}
+    </div>
+  </section>
 
   {{range $i, $node := .Nodes}}
   <section id="host-{{$node.Label | urlquery}}" class="sys-card {{if $node.Parent}}sys-card-guest{{end}} {{if $node.Exporters.HasErrors}}sys-card-error{{end}} animate-in {{if eq $i 0}}animate-in-delayed-2{{else if eq $i 1}}animate-in-delayed-3{{else}}animate-in-delayed-4{{end}}" aria-label="System {{$node.Label}}">

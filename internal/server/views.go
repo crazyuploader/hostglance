@@ -83,6 +83,7 @@ type systemPageData struct {
 	TotalNodes     int
 	GuestNodes     int // hosts with a parent; excluded from resource totals
 	ExporterErrors int
+	Reporting      int // hosts with system metrics
 	TotalCores     int
 	AvgCPUPct      float64
 	HasCPU         bool
@@ -110,6 +111,7 @@ func buildSystemPageData(views []systemView) systemPageData {
 		if v.System == nil {
 			continue
 		}
+		d.Reporting++
 		for _, t := range v.System.Temps {
 			d.MaxTempC = max(d.MaxTempC, t.Celsius)
 		}

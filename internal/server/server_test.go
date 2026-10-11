@@ -741,3 +741,15 @@ func TestBuildTemplateDataRows(t *testing.T) {
 		t.Fatalf("disk rows: %+v", d.DiskRows)
 	}
 }
+
+func TestMaxTempAndReporting(t *testing.T) {
+	t.Parallel()
+	sys := &model.SystemInfo{Temps: []model.TempSensor{{Celsius: 40}, {Celsius: 61}}}
+	if maxTemp(sys) != 61 || maxTemp(nil) != 0 {
+		t.Fatal("maxTemp")
+	}
+	d := buildSystemPageData([]systemView{{System: sys}, {}})
+	if d.Reporting != 1 || d.TotalNodes != 2 {
+		t.Fatalf("reporting %d of %d", d.Reporting, d.TotalNodes)
+	}
+}
