@@ -25,15 +25,19 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .main { flex:1; display:flex; flex-direction:column; padding:var(--space-4) var(--space-6); gap:var(--space-6); overflow-y:auto; min-width:0; }
 
 /* ── Sidebar sections ── */
-.sidebar-label { font-size:0.6rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-faint); margin-bottom:var(--space-2); }
-.range-pills { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+.sidebar-label { font-size:var(--text-xs); font-weight:600; color:var(--text-muted); margin-bottom:var(--space-2); }
+.range-pills { display:inline-flex; gap:2px; padding:2px; border:1px solid var(--border); border-radius:var(--radius-full); max-width:100%; overflow-x:auto; }
 .range-pill {
-  padding:0.25rem 0.75rem; border-radius:var(--radius-full); border:1px solid var(--border);
-  background:transparent; color:var(--text-muted); font-size:var(--text-sm); cursor:pointer;
-  font-family:var(--font-mono); transition:var(--transition); touch-action:manipulation;
+  padding:0.2rem 0.7rem; border-radius:var(--radius-full); border:0;
+  background:transparent; color:var(--text-muted); font-size:var(--text-xs); cursor:pointer;
+  font-family:var(--font-mono); transition:var(--transition); touch-action:manipulation; white-space:nowrap;
 }
-.range-pill:hover { border-color:var(--border-hi); color:var(--text); }
-.range-pill.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+.range-pill:hover { color:var(--text); }
+.range-pill.active { background:var(--primary); color:#fff; }
+.sidebar-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:var(--space-2); }
+.sidebar-head .sidebar-label { margin-bottom:0; }
+.link-btn { background:none; border:0; padding:0; color:var(--text-muted); font-size:var(--text-xs); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.link-btn:hover { color:var(--text); }
 
 /* ── Hierarchical series tree ── */
 /* node → kind → disk → metrics */
@@ -45,8 +49,8 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .node-toggle {
   display:flex; align-items:center; gap:0.35rem; width:100%; text-align:left;
   background:transparent; border:none; cursor:pointer; touch-action:manipulation;
-  font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
-  color:var(--primary); padding:0.3rem 0; border-bottom:1px solid var(--border);
+  font-size:var(--text-sm); font-weight:600;
+  color:var(--text); padding:0.35rem 0; border-bottom:1px solid var(--border);
 }
 .node-chevron { width:11px; height:11px; flex-shrink:0; margin-left:auto; color:var(--text-faint); transition:transform 180ms ease; }
 .node-group.open .node-chevron { transform:rotate(90deg); }
@@ -57,13 +61,13 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .kind-toggle {
   display:flex; align-items:center; gap:0.35rem; width:100%; text-align:left;
   background:transparent; border:none; cursor:pointer; touch-action:manipulation;
-  font-size:0.6rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;
-  color:var(--text-faint); padding:0.25rem 0.4rem; border-radius:var(--radius-md);
+  font-size:var(--text-xs); font-weight:500;
+  color:var(--text-muted); padding:0.25rem 0.4rem; border-radius:var(--radius-md);
   transition:var(--transition);
 }
 .kind-toggle:hover { background:var(--surface-2); color:var(--text-muted); }
 .kind-toggle svg:first-child { width:11px; height:11px; flex-shrink:0; opacity:0.85; }
-.kind-count { font-weight:500; opacity:0.7; text-transform:none; letter-spacing:normal; }
+.kind-count { font-weight:400; opacity:0.7; }
 .kind-chevron { width:10px; height:10px; flex-shrink:0; margin-left:auto; transition:transform 180ms ease; }
 .kind-group.open .kind-chevron { transform:rotate(90deg); }
 .kind-body { display:none; flex-direction:column; gap:0.1rem; padding:0.15rem 0 0.15rem var(--space-2); }
@@ -108,30 +112,42 @@ body { display: flex; flex-direction: column; height: 100dvh; }
 .series-color-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 .series-empty { color:var(--text-faint); font-size:var(--text-sm); padding:var(--space-2) 0; }
 
-/* ── Chart area ── */
-.chart-card {
-  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
-  padding:var(--space-4) var(--space-4) var(--space-3);
-  display:flex; flex-direction:column; gap:var(--space-3);
+/* ── Page head and toolbar ── */
+.page-title { font-size:var(--text-xl); font-weight:600; letter-spacing:-0.025em; line-height:1.1; margin:0; }
+.page-sub { font-size:var(--text-xs); color:var(--text-muted); margin-top:var(--space-1); font-family:var(--font-mono); }
+.toolbar { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3) var(--space-5); flex-wrap:wrap; border-bottom:1px solid var(--border); }
+.presets { display:flex; gap:var(--space-5); overflow-x:auto; max-width:100%; }
+.preset {
+  background:none; border:0; border-bottom:2px solid transparent; margin-bottom:-1px;
+  padding:var(--space-2) 0; color:var(--text-muted); cursor:pointer; white-space:nowrap;
+  font-size:var(--text-sm); transition:var(--transition); touch-action:manipulation;
 }
-.chart-title { font-size:var(--text-sm); font-weight:600; color:var(--text-muted); }
-.chart-num { font-variant-numeric:tabular-nums; }
+.preset:hover { color:var(--text); }
+.preset.active { color:var(--text); font-weight:600; border-bottom-color:var(--primary); }
+.toolbar .range-pills { margin-bottom:var(--space-2); }
 
-/* Current-value readout. Reuses the app's shared .kpi tile, same as the
-   fleet summary rows on Pools/System, so History reads as one system. */
-.gauge-strip.kpi-row { margin-bottom:0; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); }
-.gauge-strip:empty { display:none; }
-.gauge-strip .kpi-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-.chart-canvas-wrap { position:relative; width:100%; }
-canvas#chart { display:block; width:100%; }
-.chart-empty { min-height:200px; display:flex; align-items:center; justify-content:center; }
-.chart-empty .empty { padding:var(--space-6) var(--space-4); }
-.chart-empty .empty svg { color:var(--text-faint); }
-.chart-legend { display:flex; flex-wrap:wrap; gap:var(--space-2) var(--space-3); }
-.legend-item { display:flex; align-items:center; gap:var(--space-2); font-size:0.75rem; color:var(--text-muted); min-width:0; max-width:220px; }
-.legend-item span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-family:var(--font-mono); }
-.legend-line { width:16px; height:2px; border-radius:1px; flex-shrink:0; }
+/* ── Metric panels: one plot per metric, each with its own axis ── */
+.panels { display:flex; flex-direction:column; gap:var(--space-6); }
+.panel-head { display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-3); margin-bottom:var(--space-2); }
+.panel-title { font-size:var(--text-base); font-weight:600; margin:0; }
+.panel-note { font-size:var(--text-xs); color:var(--text-muted); font-family:var(--font-mono); }
+.plot { position:relative; }
+.plot canvas { display:block; width:100%; }
+.xline { position:absolute; width:1px; background:var(--text-faint); opacity:0.6; pointer-events:none; display:none; }
+.stats { width:100%; border-collapse:collapse; margin-top:var(--space-2); font-size:var(--text-xs); font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.stats th { font-weight:400; color:var(--text-faint); text-align:right; padding:0 0 var(--space-1); }
+.stats td { text-align:right; padding:var(--space-1) 0; border-top:1px solid var(--border); color:var(--text-muted); }
+.stats th:first-child, .stats td:first-child { text-align:left; }
+.stats td:first-child { color:var(--text); max-width:0; width:100%; }
+.stats .nm { display:flex; align-items:center; gap:var(--space-2); min-width:0; }
+.stats .nm span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stats td.now { color:var(--text); font-weight:600; }
+.swatch { width:12px; height:3px; border-radius:2px; flex:none; }
+.stats th, .stats td { padding-left:var(--space-4); }
+.stats th:first-child, .stats td:first-child { padding-left:0; }
+@media (max-width: 560px) { .stats .opt { display:none; } }
+.panels-empty { min-height:260px; display:flex; align-items:center; justify-content:center; }
+.panels-empty .empty svg { color:var(--text-faint); }
 
 /* ── Tooltip ── */
 #chart-tooltip {
@@ -172,6 +188,8 @@ canvas#chart { display:block; width:100%; }
 .status-banner { color:var(--text-faint); font-size:var(--text-sm); text-align:center; padding:var(--space-4); }
 
 /* ── Mobile ── */
+/* The series button needs room, so drop the live dot before the nav tabs clip. */
+@media (max-width: 480px) { .topbar-meta { display:none; } }
 @media (max-width: 700px) {
   .layout { flex-direction:column; position:relative; }
   .sidebar {
@@ -187,7 +205,6 @@ canvas#chart { display:block; width:100%; }
   }
   .sidebar-overlay.open { display:block; }
   .main { padding: var(--space-3); gap: var(--space-3); }
-  .chart-card { padding: var(--space-3) var(--space-3) var(--space-2); }
   #chart-tooltip { width:190px; font-size:0.72rem; }
 }
 </style>
@@ -210,7 +227,22 @@ canvas#chart { display:block; width:100%; }
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div>
-      <div class="sidebar-label">Time Range</div>
+      <div class="sidebar-head"><div class="sidebar-label">Pick series</div><button class="link-btn" id="clear-series" type="button">Clear</button></div>
+      <div class="series-tree" id="series-tree" aria-live="polite" aria-label="Series list">
+        <div class="series-empty" id="series-loading">Loading…</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div>
+      <h1 class="page-title">History</h1>
+      <p class="page-sub" id="page-sub">Sampled at each refresh</p>
+    </div>
+
+    <div class="toolbar">
+      <div class="presets" id="presets" role="group" aria-label="Quick views"></div>
       <div class="range-pills" id="range-pills">
         <button class="range-pill" data-hours="1">1h</button>
         <button class="range-pill" data-hours="6">6h</button>
@@ -223,34 +255,15 @@ canvas#chart { display:block; width:100%; }
         {{if ge .RetentionHours 8760}}<button class="range-pill" data-hours="8760">1y</button>{{end}}
       </div>
     </div>
-    <div>
-      <div class="sidebar-label">Series</div>
-      <div class="series-tree" id="series-tree" aria-live="polite" aria-label="Series list">
-        <div class="series-empty" id="series-loading">Loading…</div>
-      </div>
-    </div>
-  </aside>
 
-  <!-- Main -->
-  <main class="main">
-    <div class="chart-card">
-      <div class="chart-title" id="chart-title">No metrics selected</div>
-      <div class="gauge-strip kpi-row" id="gauge-strip" role="region" aria-label="Current values"></div>
-      <div class="chart-canvas-wrap" id="chart-wrap">
-        <div class="chart-empty" id="chart-empty">
-          <div class="empty">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="1.4" aria-hidden="true">
-              <path d="M3 3v18h18"/>
-              <path d="M7 15l3-4 3 3 4-6"/>
-            </svg>
-            <h3>Nothing plotted yet</h3>
-            <p>Select a metric in the series list to show its history.</p>
-          </div>
+    <div class="panels" id="panels" aria-live="polite">
+      <div class="panels-empty" id="panels-empty">
+        <div class="empty">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 3 4-6"/></svg>
+          <h3>Loading history</h3>
+          <p>Choose a quick view above, or pick series in the list.</p>
         </div>
-        <canvas id="chart" style="display:none"></canvas>
       </div>
-      <div class="chart-legend" id="chart-legend"></div>
     </div>
   </main>
 </div>
@@ -280,7 +293,7 @@ canvas#chart { display:block; width:100%; }
 
   /* Re-render chart when the shared theme toggle fires */
   document.addEventListener('hostglance:theme', () => {
-    if (activeSeries.length) renderChart();
+    if (activeSeries.length) renderPanels();
   });
 
   /* ── Constants ── */
@@ -333,6 +346,13 @@ canvas#chart { display:block; width:100%; }
       }
       allSeries = await res.json();
       buildTree();
+      buildPresets();
+      if (!selected.size) {
+        const first = presets[0];
+        if (first) applyPreset(first); else renderPanels();
+      } else {
+        refresh();
+      }
     } catch (e) {
       document.getElementById('series-loading').textContent = 'Could not load the series list.';
     }
@@ -444,6 +464,7 @@ canvas#chart { display:block; width:100%; }
             const dot = document.createElement('span');
             dot.className = 'series-color-dot';
             dot.style.background = colorMap[s.key];
+            dot.dataset.key = s.key;
 
             const lbl = document.createElement('span');
             lbl.className = 'series-item-label';
@@ -485,11 +506,53 @@ canvas#chart { display:block; width:100%; }
     return 86400;
   }
 
-  /* ── Fetch & render ── */
+  /* ── Quick views: each selects every series that matches ── */
+  const PRESETS = [
+    { id: 'pools', label: 'Pool fill',  match: s => s.kind === 'pool' && s.metric === 'used_pct' },
+    { id: 'cpu',   label: 'CPU & load', match: s => s.kind === 'system' && (s.metric === 'cpu_pct' || s.metric === 'load1') },
+    { id: 'mem',   label: 'Memory',     match: s => s.kind === 'system' && s.metric === 'mem_used_pct' },
+    { id: 'temps', label: 'Disk temps', match: s => s.kind === 'disk' && s.metric === 'temp_c' },
+    { id: 'wear',  label: 'Disk wear',  match: s => s.kind === 'disk' && s.metric === 'wear_pct' },
+  ];
+  let presets = [];
+  const presetsEl = document.getElementById('presets');
+
+  function buildPresets() {
+    presets = PRESETS.map(p => ({ ...p, keys: allSeries.filter(p.match).map(s => s.key) })).filter(p => p.keys.length);
+    presetsEl.innerHTML = '';
+    for (const p of presets) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'preset'; b.dataset.id = p.id; b.textContent = p.label;
+      b.addEventListener('click', () => applyPreset(p));
+      presetsEl.appendChild(b);
+    }
+    syncPresets();
+  }
+  function applyPreset(p) {
+    selected = new Set(p.keys);
+    buildTree();
+    syncPresets();
+    refresh();
+  }
+  // A tab is active only while the selection is exactly that view.
+  function syncPresets() {
+    for (const b of presetsEl.children) {
+      const p = presets.find(x => x.id === b.dataset.id);
+      const on = p.keys.length === selected.size && p.keys.every(k => selected.has(k));
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+  }
+  document.getElementById('clear-series').addEventListener('click', () => {
+    selected.clear(); buildTree(); syncPresets(); refresh();
+  });
+
+  /* ── Fetch ── */
   async function refresh() {
+    syncPresets();
     if (!selected.size) {
       activeSeries = [];
-      renderChart();
+      renderPanels();
       return;
     }
     const now = Math.floor(Date.now() / 1000);
@@ -507,220 +570,220 @@ canvas#chart { display:block; width:100%; }
 
     try {
       activeSeries = await Promise.all(fetches);
-      renderChart();
+      renderPanels();
     } catch (e) {
       console.error('history fetch failed', e);
     }
   }
 
-  /* ── Chart renderer ── */
-  const canvas = document.getElementById('chart');
-  const ctx = canvas.getContext('2d');
-  const wrap = document.getElementById('chart-wrap');
-  const empty = document.getElementById('chart-empty');
-  const legendEl = document.getElementById('chart-legend');
-  const titleEl = document.getElementById('chart-title');
+  /* ── Panels: one plot per metric ── */
+  const panelsEl = document.getElementById('panels');
+  const emptyEl = document.getElementById('panels-empty');
   const tooltip = document.getElementById('chart-tooltip');
   const ttTime = document.getElementById('tt-time');
   const ttRows = document.getElementById('tt-rows');
-  const gaugeStrip = document.getElementById('gauge-strip');
-  const PAD = { top: 16, right: 16, bottom: 40, left: 62 };
+  const PAD = { top: 10, right: 12, bottom: 26, left: 58 };
+  const METRIC_ORDER = ['used_pct', 'cpu_pct', 'load1', 'mem_used_pct', 'temp_c', 'wear_pct'];
+  const NOT_ZERO_BASED = { temp_c: 1, pow_hrs: 1, dedup_ratio: 1 };
+  let panelState = [];
 
-  function renderChart() {
-    const hasPts = activeSeries.some(s => s.points && s.points.length > 0);
-    if (!activeSeries.length || !hasPts) {
-      canvas.style.display = 'none';
-      empty.style.display = 'flex';
-      empty.querySelector('h3').textContent = selected.size ? 'No data in this range' : 'Nothing plotted yet';
-      empty.querySelector('p').textContent = selected.size
-        ? 'Select a longer time range, or wait for more samples.'
-        : 'Select a metric in the series list to show its history.';
-      legendEl.innerHTML = '';
-      gaugeStrip.innerHTML = '';
-      titleEl.textContent = 'No metrics selected';
+  function showEmpty(title, text) {
+    emptyEl.style.display = 'flex';
+    emptyEl.querySelector('h3').textContent = title;
+    emptyEl.querySelector('p').textContent = text;
+  }
+
+  function renderPanels() {
+    for (const el of [...panelsEl.children]) if (el !== emptyEl) el.remove();
+    panelState = [];
+    const live = activeSeries.filter(s => s.info && s.points && s.points.length);
+    if (!live.length) {
+      if (selected.size) showEmpty('No data in this range', 'Pick a longer time range, or wait for more samples.');
+      else showEmpty('Nothing selected', 'Choose a quick view above, or pick series in the list.');
       return;
     }
-    canvas.style.display = 'block';
-    empty.style.display = 'none';
-
-    const metrics = [...new Set(activeSeries.map(s => s.info?.metric).filter(Boolean))];
-    titleEl.textContent = metrics.map(m => METRIC_LABELS[m] || m).join(' · ');
-
-    const dpr = window.devicePixelRatio || 1;
-    const W = wrap.clientWidth;
-    const H = Math.max(200, Math.min(400, W * 0.38));
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const plotW = W - PAD.left - PAD.right;
-    const plotH = H - PAD.top - PAD.bottom;
-
-    let minTs = Infinity, maxTs = -Infinity, minV = Infinity, maxV = -Infinity;
-    for (const s of activeSeries) {
-      for (const p of (s.points || [])) {
-        if (p.ts < minTs) minTs = p.ts;
-        if (p.ts > maxTs) maxTs = p.ts;
-        if (p.v < minV)  minV = p.v;
-        if (p.v > maxV)  maxV = p.v;
-      }
-    }
-    if (!isFinite(minTs)) return;
-
-    const tsSpan = maxTs - minTs || 1;
-    const vRange = maxV - minV || 1;
-    const vPad  = vRange * 0.12;
-    const yMin  = Math.max(0, minV - vPad);
-    const yMax  = maxV + vPad;
-
-    const xScale = ts => PAD.left + ((ts - minTs) / tsSpan) * plotW;
-    const yScale = v  => PAD.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
-
-    ctx.clearRect(0, 0, W, H);
-
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
-    const labelColor = isDark ? '#85858f' : '#62626b';
-    const Y_STEPS = 4;
-    ctx.font = '11px ' + getComputedStyle(document.body).getPropertyValue('--font-mono').trim();
-    const yAxisMetric = activeSeries[0]?.info?.metric || metrics[0];
-
-    for (let i = 0; i <= Y_STEPS; i++) {
-      const v = yMin + (yMax - yMin) * (i / Y_STEPS);
-      const y = yScale(v);
-      ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
-      ctx.fillStyle = labelColor; ctx.textAlign = 'right';
-      ctx.fillText(fmtVal(v, yAxisMetric), PAD.left - 6, y + 4);
+    emptyEl.style.display = 'none';
+    const gaps = [...new Set(activeSeries.filter(s => s.info && !(s.points && s.points.length)).map(s => METRIC_LABELS[s.info.metric] || s.info.metric))];
+    if (gaps.length) {
+      const note = document.createElement('p');
+      note.className = 'panel-note';
+      note.textContent = 'Some selected series have no samples in this range: ' + gaps.join(', ') + '.';
+      panelsEl.appendChild(note);
     }
 
-    const X_STEPS = Math.min(6, Math.floor(plotW / 70));
-    for (let i = 0; i <= X_STEPS; i++) {
-      const ts = minTs + tsSpan * (i / X_STEPS);
-      const x = xScale(ts);
-      ctx.fillStyle = labelColor; ctx.textAlign = 'center';
-      ctx.fillText(fmtTime(ts, rangeHours), x, H - PAD.bottom + 16);
+    // One time axis for every panel, so the hover line lines up.
+    let minTs = Infinity, maxTs = -Infinity;
+    for (const s of live) for (const p of s.points) { minTs = Math.min(minTs, p.ts); maxTs = Math.max(maxTs, p.ts); }
+
+    const byMetric = {};
+    for (const s of live) (byMetric[s.info.metric] = byMetric[s.info.metric] || []).push(s);
+    const order = Object.keys(byMetric).sort((a, b) => {
+      const ia = METRIC_ORDER.indexOf(a), ib = METRIC_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+
+    for (const metric of order) {
+      const list = byMetric[metric];
+      // Colours restart in every panel, so the first lines are always the most distinct.
+      list.forEach((s, i) => {
+        colorMap[s.key] = COLORS[i % COLORS.length];
+        document.querySelectorAll('.series-color-dot').forEach(d => { if (d.dataset.key === s.key) d.style.background = colorMap[s.key]; });
+      });
+      const sec = document.createElement('section');
+      sec.className = 'panel';
+      sec.innerHTML =
+        '<div class="panel-head"><h2 class="panel-title">' + esc(METRIC_LABELS[metric] || metric) + '</h2>' +
+        '<span class="panel-note">' + list.length + ' series' + '</span></div>' +
+        '<div class="plot"><canvas></canvas><div class="xline"></div></div>' +
+        statsTable(metric, list);
+      panelsEl.appendChild(sec);
+      const plot = sec.querySelector('.plot');
+      const st = drawPanel(plot.querySelector('canvas'), metric, list, minTs, maxTs, order.length === 1);
+      st.line = plot.querySelector('.xline');
+      st.list = list; st.metric = metric;
+      panelState.push(st);
+      const cv = plot.querySelector('canvas');
+      cv.addEventListener('mousemove', e => hover(e, st));
+      cv.addEventListener('mouseleave', hideHover);
+      cv.addEventListener('touchmove', e => { e.preventDefault(); const t = e.touches[0]; hover({ clientX: t.clientX, clientY: t.clientY }, st); }, { passive: false });
+      cv.addEventListener('touchend', hideHover);
     }
-
-    for (const s of activeSeries) {
-      if (!s.points || !s.points.length) continue;
-      const color = colorMap[s.key] || COLORS[0];
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(PAD.left, PAD.top, plotW, plotH);
-      ctx.clip();
-
-      ctx.beginPath();
-      let first = true;
-      for (const p of s.points) {
-        const x = xScale(p.ts), y = yScale(p.v);
-        if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
-      }
-      const lastPt = s.points[s.points.length - 1];
-      const firstPt = s.points[0];
-      ctx.lineTo(xScale(lastPt.ts), PAD.top + plotH);
-      ctx.lineTo(xScale(firstPt.ts), PAD.top + plotH);
-      ctx.closePath();
-      ctx.fillStyle = color + '18';
-      ctx.fill();
-
-      ctx.beginPath();
-      first = true;
-      for (const p of s.points) {
-        const x = xScale(p.ts), y = yScale(p.v);
-        if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    legendEl.innerHTML = '';
-    gaugeStrip.innerHTML = '';
-    for (const s of activeSeries) {
-      if (!s.info || !s.points || !s.points.length) continue;
-      const color = colorMap[s.key] || COLORS[0];
-      const shortName = seriesLabel(s.info);
-
-      const li = document.createElement('div');
-      li.className = 'legend-item';
-      li.innerHTML = '<div class="legend-line" style="background:' + color + '"></div>' +
-        '<span>' + esc(shortName) + ' · ' + esc(METRIC_LABELS[s.info.metric] || s.info.metric) + '</span>';
-      legendEl.appendChild(li);
-
-      const last = s.points[s.points.length - 1];
-      const truncName = shortName.length > 20 ? shortName.slice(0, 18) + '…' : shortName;
-      const kpi = document.createElement('div');
-      kpi.className = 'kpi';
-      kpi.innerHTML = '<div class="kpi-label">' + esc(truncName) + '</div>' +
-        '<div class="kpi-val neutral">' + esc(fmtVal(last.v, s.info.metric)) + '</div>' +
-        '<div class="kpi-hint">' + esc(METRIC_LABELS[s.info.metric] || s.info.metric) + '</div>';
-      gaugeStrip.appendChild(kpi);
-    }
-
-    canvas._renderState = { xScale, yScale, tsSpan, minTs, maxTs, yMin, yMax, plotW, plotH, W, H };
   }
 
-  /* ── Tooltip ── */
-  function showTooltip(e) {
-    const rs = canvas._renderState;
-    if (!rs || !activeSeries.length) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    if (mouseX < PAD.left || mouseX > rs.W - PAD.right) { tooltip.style.display = 'none'; return; }
+  function statsTable(metric, list) {
+    let rows = '';
+    for (const s of list) {
+      const vs = s.points.map(p => p.v);
+      const avg = vs.reduce((a, b) => a + b, 0) / vs.length;
+      rows += '<tr><td><span class="nm"><span class="swatch" style="background:' + (colorMap[s.key] || COLORS[0]) + '"></span>' +
+        '<span title="' + esc(seriesLabel(s.info)) + '">' + esc(seriesLabel(s.info)) + '</span></span></td>' +
+        '<td class="now">' + esc(fmtVal(vs[vs.length - 1], metric)) + '</td>' +
+        '<td class="opt">' + esc(fmtVal(Math.min(...vs), metric)) + '</td>' +
+        '<td class="opt">' + esc(fmtVal(avg, metric)) + '</td>' +
+        '<td>' + esc(fmtVal(Math.max(...vs), metric)) + '</td></tr>';
+    }
+    return '<table class="stats"><thead><tr><th>Series</th><th>Now</th><th class="opt">Min</th><th class="opt">Avg</th><th>Max</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
 
-    const ts = rs.minTs + ((mouseX - PAD.left) / rs.plotW) * rs.tsSpan;
+  // Round axis ends to clean values (0, 25, 50 ...) so the labels read well.
+  function niceAxis(metric, minV, maxV) {
+    const zero = !NOT_ZERO_BASED[metric];
+    let lo = zero ? 0 : minV, hi = maxV;
+    if (hi - lo < 1e-9) hi = lo + 1;
+    const raw = (hi - lo) / 3, mag = Math.pow(10, Math.floor(Math.log10(raw))), norm = raw / mag;
+    const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+    lo = Math.floor(lo / step) * step;
+    hi = Math.ceil(hi / step) * step;
+    if (PCT_METRICS[metric]) hi = Math.min(hi, 100);
+    return { lo, hi, step };
+  }
 
+  function drawPanel(canvas, metric, list, minTs, maxTs, tall) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.parentElement.clientWidth;
+    const H = W < 560 ? 160 : tall ? 280 : 200;
+    canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const plotW = W - PAD.left - PAD.right, plotH = H - PAD.top - PAD.bottom;
+
+    let minV = Infinity, maxV = -Infinity;
+    for (const s of list) for (const p of s.points) { minV = Math.min(minV, p.v); maxV = Math.max(maxV, p.v); }
+    const { lo: yMin, hi: yMax, step } = niceAxis(metric, minV, maxV);
+    const tsSpan = maxTs - minTs || 1;
+    const xScale = ts => PAD.left + ((ts - minTs) / tsSpan) * plotW;
+    const yScale = v => PAD.top + plotH - ((v - yMin) / (yMax - yMin || 1)) * plotH;
+
+    const css = getComputedStyle(document.documentElement);
+    const gridColor = css.getPropertyValue('--border-hi').trim() || 'rgba(128,128,128,0.2)';
+    const labelColor = css.getPropertyValue('--text-faint').trim() || '#888';
+    ctx.font = '11px ' + css.getPropertyValue('--font-mono').trim();
+
+    ctx.save();
+    ctx.setLineDash([2, 4]);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+    ctx.fillStyle = labelColor; ctx.textAlign = 'right';
+    for (let v = yMin; v <= yMax + step / 2; v += step) {
+      const y = Math.round(yScale(v)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+      ctx.fillText(fmtVal(v, metric), PAD.left - 8, y + 4);
+    }
+    ctx.restore();
+
+    ctx.fillStyle = labelColor; ctx.textAlign = 'center';
+    const xSteps = Math.max(1, Math.min(6, Math.floor(plotW / 90)));
+    for (let i = 0; i <= xSteps; i++) {
+      ctx.textAlign = i === 0 ? 'left' : i === xSteps ? 'right' : 'center';
+      const ts = minTs + tsSpan * (i / xSteps);
+      ctx.fillText(fmtTime(ts, rangeHours), xScale(ts) + (i === 0 ? -2 : i === xSteps ? 2 : 0), H - 8);
+    }
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(PAD.left, PAD.top - 2, plotW, plotH + 4); ctx.clip();
+    for (const s of list) {
+      const color = colorMap[s.key] || COLORS[0];
+      ctx.beginPath();
+      s.points.forEach((p, i) => i ? ctx.lineTo(xScale(p.ts), yScale(p.v)) : ctx.moveTo(xScale(p.ts), yScale(p.v)));
+      if (list.length === 1) {
+        const g = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + plotH);
+        g.addColorStop(0, color + '40'); g.addColorStop(1, color + '00');
+        const last = s.points[s.points.length - 1], first = s.points[0];
+        ctx.save();
+        ctx.lineTo(xScale(last.ts), PAD.top + plotH); ctx.lineTo(xScale(first.ts), PAD.top + plotH);
+        ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+        ctx.restore();
+        ctx.beginPath();
+        s.points.forEach((p, i) => i ? ctx.lineTo(xScale(p.ts), yScale(p.v)) : ctx.moveTo(xScale(p.ts), yScale(p.v)));
+      }
+      ctx.strokeStyle = color; ctx.lineWidth = 1.75; ctx.lineJoin = 'round'; ctx.stroke();
+    }
+    ctx.restore();
+    // mark the latest value on each line
+    for (const s of list) {
+      const p = s.points[s.points.length - 1];
+      ctx.beginPath(); ctx.arc(xScale(p.ts), yScale(p.v), 3, 0, Math.PI * 2);
+      ctx.fillStyle = colorMap[s.key] || COLORS[0]; ctx.fill();
+    }
+    return { canvas, xScale, minTs, tsSpan, plotW, plotH, W };
+  }
+
+  /* ── Hover: a line on every panel at the same time, values for the hovered one ── */
+  function hover(e, st) {
+    const rect = st.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < PAD.left || x > st.W - PAD.right) { hideHover(); return; }
+    const ts = st.minTs + ((x - PAD.left) / st.plotW) * st.tsSpan;
+    for (const p of panelState) {
+      p.line.style.display = 'block';
+      p.line.style.left = p.xScale(ts) + 'px';
+      p.line.style.top = PAD.top + 'px';
+      p.line.style.height = p.plotH + 'px';
+    }
     ttTime.textContent = fmtTimeFull(ts);
     ttRows.innerHTML = '';
-
-    for (const s of activeSeries) {
-      if (!s.points || !s.points.length) continue;
-      let nearest = s.points[0];
-      let minDist = Math.abs(s.points[0].ts - ts);
-      for (const p of s.points) {
-        const d = Math.abs(p.ts - ts);
-        if (d < minDist) { minDist = d; nearest = p; }
-      }
-      const color = colorMap[s.key] || COLORS[0];
-      const rawName = s.info ? seriesLabel(s.info) : s.key;
-      const shortName = rawName.length > 20 ? rawName.slice(0, 18) + '…' : rawName;
+    for (const s of st.list) {
+      let nearest = s.points[0], best = Math.abs(nearest.ts - ts);
+      for (const p of s.points) { const d = Math.abs(p.ts - ts); if (d < best) { best = d; nearest = p; } }
+      const name = seriesLabel(s.info);
       const row = document.createElement('div');
       row.className = 'tooltip-row';
-      row.innerHTML =
-        '<span class="tooltip-dot" style="background:' + color + '"></span>' +
-        '<span class="tooltip-name">' + esc(shortName) + '</span>' +
-        '<span class="tooltip-val">' + esc(fmtValFull(nearest.v, s.info?.metric)) + '</span>';
+      row.innerHTML = '<span class="tooltip-dot" style="background:' + (colorMap[s.key] || COLORS[0]) + '"></span>' +
+        '<span class="tooltip-name">' + esc(name.length > 20 ? name.slice(0, 18) + '…' : name) + '</span>' +
+        '<span class="tooltip-val">' + esc(fmtValFull(nearest.v, st.metric)) + '</span>';
       ttRows.appendChild(row);
     }
-
     tooltip.style.display = 'block';
-
-    // Smart positioning: keep tooltip within viewport
-    const tw = tooltip.offsetWidth;
-    const th = tooltip.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let tx = e.clientX + 16;
-    let ty = e.clientY - 10;
-    if (tx + tw > vw - 8) tx = e.clientX - tw - 16;
-    if (ty + th > vh - 8) ty = vh - th - 8;
-    if (ty < 8) ty = 8;
+    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    let tx = e.clientX + 16, ty = e.clientY - 10;
+    if (tx + tw > window.innerWidth - 8) tx = e.clientX - tw - 16;
+    if (ty + th > window.innerHeight - 8) ty = window.innerHeight - th - 8;
     tooltip.style.left = tx + 'px';
-    tooltip.style.top = ty + 'px';
+    tooltip.style.top = Math.max(8, ty) + 'px';
   }
-
-  canvas.addEventListener('mousemove', showTooltip);
-  canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
-
-  // Touch support for tooltip
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const t = e.touches[0];
-    showTooltip({ clientX: t.clientX, clientY: t.clientY });
-  }, { passive: false });
-  canvas.addEventListener('touchend', () => { tooltip.style.display = 'none'; });
+  function hideHover() {
+    tooltip.style.display = 'none';
+    for (const p of panelState) p.line.style.display = 'none';
+  }
 
   const MIB_METRICS = { alloc_bytes: 1, free_bytes: 1, written_bytes: 1 };
   const RATE_METRICS = { rx_bps: 1, tx_bps: 1 };
@@ -774,10 +837,16 @@ canvas#chart { display:block; width:100%; }
   }
 
   /* ── Resize ── */
-  const ro = new ResizeObserver(() => { if (activeSeries.length) renderChart(); });
-  ro.observe(wrap);
+  let lastW = 0;
+  new ResizeObserver(() => {
+    const w = panelsEl.clientWidth;
+    if (w !== lastW && activeSeries.length) { lastW = w; renderPanels(); }
+  }).observe(panelsEl);
 
   /* ── Init ── */
+  const rh = {{.RetentionHours}};
+  document.getElementById('page-sub').textContent =
+    'Sampled at each refresh, kept for ' + (rh >= 48 ? Math.round(rh / 24) + ' days' : rh + ' hours');
   loadSeries();
 })();
 </script>
