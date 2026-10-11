@@ -98,6 +98,13 @@ type templateData struct {
 	DegradedPools int
 	ErroredPools  int
 	TotalNodes    int
+	// Usable capacity over ZFS pools (after parity) and Proxmox storages.
+	UsableTotal float64
+	UsableUsed  float64
+	// RawTotal is physical disk capacity. A host without SMART data counts pool size instead.
+	RawTotal float64
+	// CapScale is the bar width basis: raw, or usable if that is larger.
+	CapScale float64
 }
 
 // historyData is the data passed to the history page template.
@@ -601,8 +608,21 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 		if node.Exporters.ZFS.Error != "" || node.Exporters.Smartctl.Error != "" {
 			d.StorageErrors++
 		}
+		var disks, fallback float64
+		for _, dk := range node.Disks {
+			disks += dk.CapacityBytes
+		}
+		for _, st := range node.PVEStorages {
+			d.UsableTotal += st.Total
+			d.UsableUsed += st.Used
+			fallback += st.Total
+		}
 		for _, pool := range node.Pools {
 			d.TotalPools++
+			total, used := poolUsable(pool)
+			d.UsableTotal += total
+			d.UsableUsed += used
+			fallback += pool.Size
 			switch pool.Health {
 			case model.HealthOnline:
 				d.HealthyPools++
@@ -612,8 +632,25 @@ func buildTemplateData(nodes []model.NodeData) templateData {
 				d.ErroredPools++
 			}
 		}
+		if disks > 0 {
+			d.RawTotal += disks
+		} else {
+			d.RawTotal += fallback
+		}
 	}
+	d.CapScale = max(d.RawTotal, d.UsableTotal)
 	return d
+}
+
+// poolUsable returns usable bytes and used bytes. The root dataset counts
+// space after parity; zpool size is raw, so it is only the fallback.
+func poolUsable(p model.Pool) (total, used float64) {
+	for _, ds := range p.Datasets {
+		if ds.Name == p.Name {
+			return ds.Used + ds.Available, ds.Used
+		}
+	}
+	return p.Size, p.Allocated
 }
 
 func serveHealthCheck(c fiber.Ctx, f *fetcher.Fetcher, label, poolName string, cfg *config.Config) error {

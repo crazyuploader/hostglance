@@ -657,3 +657,27 @@ func TestPVEStoragesSkipPoolsTheZFSExporterShows(t *testing.T) {
 		t.Error("a host with only Proxmox storages must show on the Storage page")
 	}
 }
+
+func TestPoolUsable(t *testing.T) {
+	t.Parallel()
+	p := model.Pool{Name: "tank", Size: 100, Allocated: 40, Datasets: []model.Dataset{{Name: "tank", Used: 30, Available: 50}}}
+	if total, used := poolUsable(p); total != 80 || used != 30 {
+		t.Fatalf("root dataset: got %v/%v", total, used)
+	}
+	p.Datasets = nil
+	if total, used := poolUsable(p); total != 100 || used != 40 {
+		t.Fatalf("fallback: got %v/%v", total, used)
+	}
+}
+
+func TestBuildTemplateDataRaw(t *testing.T) {
+	t.Parallel()
+	d := buildTemplateData([]model.NodeData{{
+		Label: "a", Exporters: model.ExporterStatuses{ZFS: model.ExporterStatus{Available: true}},
+		Pools: []model.Pool{{Name: "tank", Size: 50}},
+		Disks: []model.DiskInfo{{CapacityBytes: 30}, {CapacityBytes: 30}},
+	}})
+	if d.RawTotal != 60 {
+		t.Fatalf("raw: got %v", d.RawTotal)
+	}
+}
